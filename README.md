@@ -1,6 +1,6 @@
 # 完整的 README.md
 
-```markdown
+
 # 🏨 分布式酒店空调管理系统
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -112,7 +112,7 @@
 
 ## 📁 项目结构
 
-```
+
 hotel-ac-system/
 ├── backend/                          # 后端Java项目
 │   ├── src/
@@ -177,7 +177,7 @@ hotel-ac-system/
 ├── .gitignore                        # Git忽略文件
 ├── LICENSE                           # 许可证
 └── README.md                         # 项目总说明（本文件）
-```
+
 
 ---
 
