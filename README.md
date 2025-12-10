@@ -112,72 +112,57 @@
 
 ## 📁 项目结构
 
-
+```text
 hotel-ac-system/
-├── backend/                          # 后端Java项目
-│   ├── src/
-│   │   └── main/
-│   │       ├── java/
-│   │       │   └── com/
-│   │       │       ├── api/          # REST API控制器
-│   │       │       │   └── HotelApiController.java
-│   │       │       ├── config/       # 系统配置
-│   │       │       │   └── SystemContext.java
-│   │       │       ├── controller/   # 业务控制器
-│   │       │       │   ├── AcController.java
-│   │       │       │   ├── BillController.java
-│   │       │       │   └── CustomerController.java
-│   │       │       ├── model/        # 数据模型
-│   │       │       │   └── entity/
-│   │       │       │       ├── Room.java
-│   │       │       │       ├── AcBill.java
-│   │       │       │       ├── AcDetailRecord.java
-│   │       │       │       └── ...
-│   │       │       ├── repository/   # 数据访问层
-│   │       │       │   ├── RoomRepository.java
-│   │       │       │   ├── InMemoryRoomRepository.java
-│   │       │       │   └── ...
-│   │       │       ├── scheduler/    # 调度器
-│   │       │       │   ├── Scheduler.java
-│   │       │       │   ├── DefaultScheduler.java
-│   │       │       │   └── ServiceContext.java
-│   │       │       ├── service/      # 业务服务层
-│   │       │       │   ├── AcService.java
-│   │       │       │   ├── AcBillingService.java
-│   │       │       │   └── impl/
-│   │       │       │       ├── AcServiceImpl.java
-│   │       │       │       ├── AcBillingServiceImpl.java
-│   │       │       │       └── ...
-│   │       │       └── simulation/   # 温度模拟
-│   │       │           └── TemperatureModel.java
-│   │       └── resources/
-│   │           └── application.properties
-│   ├── pom.xml                       # Maven配置
-│   └── README.md                     # 后端说明文档
+├── backend/                          # 后端 Java 项目 (Spring Boot)
+│   ├── src/main/java/com/
+│   │   ├── api/                      # 接口层 (统一入口)
+│   │   │   └── HotelApiController.java
+│   │   ├── config/                   # 配置层
+│   │   │   └── SystemContext.java
+│   │   ├── controller/               # 控制层 (业务分发)
+│   │   │   ├── AcController.java
+│   │   │   ├── BillController.java
+│   │   │   └── CustomerController.java
+│   │   ├── model/entity/             # 实体类
+│   │   │   ├── Room.java             # 房间实体 (含入住天数)
+│   │   │   ├── AcBill.java           # 账单实体
+│   │   │   └── AcDetailRecord.java   # 详单记录
+│   │   ├── repository/               # 数据访问层 (内存存储)
+│   │   │   ├── RoomRepository.java
+│   │   │   └── ...
+│   │   ├── scheduler/                # 核心调度器
+│   │   │   ├── Scheduler.java
+│   │   │   └── DefaultScheduler.java # 调度算法实现
+│   │   ├── service/                  # 业务逻辑层
+│   │   │   ├── impl/
+│   │   │   │   ├── AcBillingServiceImpl.java # 计费逻辑
+│   │   │   │   └── ...
+│   │   └── simulation/               # 模拟层
+│   │       └── TemperatureModel.java # 温度变化模拟   │   │   └── Monitor.vue           # 监控页面
+│   │   ├── App.vue
+│   │   └── main.js
+│   ├── public/
+│   ├── package.json                  # npm 依赖管理
+│   └── vite.config.js                # Vite 配置
 │
-├── frontend/                         # 前端Vue项目
-│   ├── src/
-│   │   ├── api/                      # API接口
-│   │   │   ├── index.js
-│   │   │   └── testCases.js          # 测试用例
-│   │   ├── components/               # Vue组件
-│   │   │   └── AcMonitor.vue         # 监控界面
-│   │   ├── router/                   # 路由配置
-│   │   │   └── index.js
-│   │   ├── views/                    # 页面视图
-│   │   │   ├── Home.vue
-│   │   │   └── Monitor.vue
-│   │   ├── App.vue                   # 根组件
-│   │   └── main.js                   # 入口文件
-│   ├── public/                       # 静态资源
-│   ├── package.json                  # npm配置
-│   ├── vite.config.js                # Vite配置
-│   └── README.md                     # 前端说明文档
+│   ├── index.js              # Axios 封装
+│   │   │   └── testCases.js          # 自动化测试用例
+│   │   ├── components/
+│   │   │   └── AcMonitor.vue         # 监控大屏组件
+│   │   ├── views/
 │
-├── .gitignore                        # Git忽略文件
-├── LICENSE                           # 许可证
-└── README.md                         # 项目总说明（本文件）
-
+│   ├── src/main/resources/
+│   │   └── application.properties    # 配置文件
+│   └── pom.xml                       # Maven 依赖管理
+│
+├── frontend/                         # 前端 Vue 项目
+│   ├── src/
+│   │   ├── api/
+│   │   ├── .gitignore                        # Git 忽略配置
+├── LICENSE                           # 开源协议
+└── README.md                         # 项目说明文档
+```
 
 ---
 
