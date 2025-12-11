@@ -343,11 +343,9 @@ public class HotelApiController {
                 .append(String.format("%.2f", r.getTotalFee())).append("\n");
             }
 
-             // UTF-8 BOM
             byte[] bom = new byte[]{(byte)0xEF, (byte)0xBB, (byte)0xBF};
             byte[] csvBytes = sb.toString().getBytes(StandardCharsets.UTF_8);
 
-            // 拼接 BOM + CSV 内容
             byte[] result = new byte[bom.length + csvBytes.length];
             System.arraycopy(bom, 0, result, 0, bom.length);
             System.arraycopy(csvBytes, 0, result, bom.length, csvBytes.length);
