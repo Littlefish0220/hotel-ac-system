@@ -11,6 +11,14 @@ export const ROOM_INIT_CONFIG = [
 
 // 2. 验收测试脚本
 export const TEST_SCENARIO = [
+  // ★ t=0: 所有测试房间办理入住
+  { timeOffset: 0, roomNo: '101', action: 'checkIn', customerName: '张三' },
+  { timeOffset: 0, roomNo: '102', action: 'checkIn', customerName: '李四' },
+  { timeOffset: 0, roomNo: '103', action: 'checkIn', customerName: '王五' },
+  { timeOffset: 0, roomNo: '104', action: 'checkIn', customerName: '赵六' },
+  { timeOffset: 0, roomNo: '105', action: 'checkIn', customerName: '钱七' },
+  
+  // 原有测试步骤
   { timeOffset: 0, roomNo: '101', action: 'powerOn' },
   { timeOffset: 1, roomNo: '101', targetTemp: 18 },
   { timeOffset: 1, roomNo: '102', action: 'powerOn' },
@@ -43,14 +51,12 @@ export const TEST_SCENARIO = [
   { timeOffset: 25, roomNo: '104', action: 'powerOff' }
 ]
 
-// 【新增】测试元数据
 export const TEST_METADATA = {
-  totalDuration: 25,  // 测试总时长（分钟）
+  totalDuration: 25,
   description: '酒店空调系统验收测试',
   version: '1.0'
 }
 
-// 【新增】获取最大时间偏移
 export const getMaxTimeOffset = () => {
   return Math.max(...TEST_SCENARIO.map(item => item.timeOffset))
 }
