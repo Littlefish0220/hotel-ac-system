@@ -42,17 +42,13 @@ public class HotelApiController {
         Map<String, Object> result = new HashMap<>();
         List<Room> rooms = context.roomRepository.findAll();
 
-        // 获取当前系统时间（秒）
         int currentTimeSeconds = context.globalTimeCounter * 60;
-
-        // 获取计费服务实例
         AcBillingServiceImpl billingService = (AcBillingServiceImpl) context.billingService;
 
         List<Map<String, Object>> roomData = rooms.stream().map(room -> {
             Map<String, Object> data = new HashMap<>();
             String roomId = room.getRoomId();
 
-            // 基础信息
             data.put("roomNo", roomId);
             data.put("initialTemp", room.getInitialTemperature());
             data.put("currentTemp", room.getCurrentTemperature());
@@ -62,26 +58,18 @@ public class HotelApiController {
             data.put("state", getRoomState(roomId));
             data.put("status", room.isOccupied() ? "occupied" : "free");
             data.put("customerName", getCustomerName(roomId));
-
-            // 修改：直接从 Room 获取入住天数
             data.put("checkInDays", room.getCheckInDays());
 
-            // 获取本次消费（当前活跃服务段的费用）
             double sessionFee = billingService.getCurrentSessionFee(roomId, currentTimeSeconds);
             data.put("sessionFee", sessionFee);
 
-            // 获取累计空调费用（只包含已结算的费用）
             double acFee = billingService.getRoomTotalFee(roomId);
             data.put("acFee", acFee);
 
-            // 计算总费用（累计空调费 + 本次消费）
             double totalAcFee = acFee + sessionFee;
             data.put("fee", totalAcFee);
 
-            // 房费相关（用于账单预览）
             data.put("totalRoomFee", room.getCheckInDays() * room.getPrice());
-
-            // 服务时长（秒）
             data.put("serviceDuration", 0);
 
             return data;
@@ -90,7 +78,7 @@ public class HotelApiController {
         Map<String, Object> systemInfo = new HashMap<>();
         systemInfo.put("timeCounter", context.globalTimeCounter);
         systemInfo.put("isSystemOn", true);
-        systemInfo.put("mode", "cool");
+        systemInfo.put("mode", context.systemMode == ACMode.COOLING ? "cool" : "heat");
         systemInfo.put("maxLimit", 3);
 
         result.put("rooms", roomData);
@@ -107,7 +95,7 @@ public class HotelApiController {
 
         try {
             if ("powerOn".equals(action)) {
-                context.acController.powerOn(roomNo, ACMode.COOLING);
+                context.acController.powerOn(roomNo, context.systemMode);
             } else if ("powerOff".equals(action)) {
                 context.acController.powerOff(roomNo);
             }
@@ -131,6 +119,32 @@ public class HotelApiController {
         } catch (Exception e) {
             e.printStackTrace();
             return Map.of("code", 500, "msg", "操作失败: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/system/mode")
+    public Map<String, Object> changeSystemMode(@RequestBody Map<String, String> payload) {
+        String mode = payload.get("mode");
+
+        try {
+            ACMode newMode;
+            if ("cool".equalsIgnoreCase(mode)) {
+                newMode = ACMode.COOLING;
+            } else if ("heat".equalsIgnoreCase(mode)) {
+                newMode = ACMode.HEATING;
+            } else {
+                return Map.of("code", 400, "msg", "无效的模式: " + mode);
+            }
+
+            context.switchModeAndReset(newMode);
+
+            return Map.of(
+                    "code", 200,
+                    "msg", "模式切换成功，房间已重新初始化",
+                    "mode", mode);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return Map.of("code", 500, "msg", "模式切换失败: " + e.getMessage());
         }
     }
 
@@ -173,10 +187,9 @@ public class HotelApiController {
         try {
             Room room = context.roomRepository.findById(roomNo);
             if (room == null) {
-                return Map.of("code", 404, "msg", "无数据");
+                return Map.of("code", 404, "msg", "房间不存在");
             }
 
-            // 使用计费服务获取准确费用
             AcBillingServiceImpl billingService = (AcBillingServiceImpl) context.billingService;
             int currentTimeSeconds = context.globalTimeCounter * 60;
 
@@ -184,7 +197,6 @@ public class HotelApiController {
             double sessionFee = billingService.getCurrentSessionFee(roomNo, currentTimeSeconds);
             double totalAcFee = acFee + sessionFee;
 
-            // ★ 修改：使用 room.getCheckInDays()
             int days = room.getCheckInDays();
             double roomFee = days * room.getPrice();
             double total = totalAcFee + roomFee;
@@ -225,7 +237,6 @@ public class HotelApiController {
                 return Map.of("code", 404, "msg", "房间不存在");
             }
 
-            // 使用计费服务获取准确费用
             AcBillingServiceImpl billingService = (AcBillingServiceImpl) context.billingService;
             int currentTimeSeconds = context.globalTimeCounter * 60;
 
@@ -233,7 +244,6 @@ public class HotelApiController {
             double sessionFee = billingService.getCurrentSessionFee(roomNo, currentTimeSeconds);
             double totalAcFee = acFee + sessionFee;
 
-            // ★ 修改：使用 room.getCheckInDays()
             int days = room.getCheckInDays();
             double roomFee = days * room.getPrice();
 
@@ -245,11 +255,10 @@ public class HotelApiController {
             billData.put("total", totalAcFee + roomFee);
             billData.put("checkInDays", days);
             billData.put("detailLogs", context.detailRepo.findByRoomId(roomNo));
-            
+
             context.customerController.checkOut(roomNo);
             context.detailRepo.findByRoomId(roomNo).clear();
 
-            // ★ 修改：清空入住天数
             room.setCheckInDays(0);
             context.roomRepository.save(room);
 
@@ -312,7 +321,7 @@ public class HotelApiController {
             sb.append("------------------------------\n");
             sb.append("空调费用: ").append(String.format("%.2f", totalAcFee)).append(" 元\n");
             sb.append("住宿费用: ").append(String.format("%.2f", roomFee))
-            .append(" 元 (").append(room.getPrice()).append("元/天 x ").append(days).append(")\n");
+                    .append(" 元 (").append(room.getPrice()).append("元/天 x ").append(days).append(")\n");
             sb.append("------------------------------\n");
             sb.append("总计应收: ").append(String.format("%.2f", total)).append(" 元\n");
 
@@ -333,16 +342,16 @@ public class HotelApiController {
 
             for (AcDetailRecord r : logs) {
                 sb.append(roomNo).append(",")
-                .append(r.getRequestTimeSeconds()).append(",")
-                .append(r.getServiceStartTimeSeconds()).append(",")
-                .append(r.getServiceEndTimeSeconds()).append(",")
-                .append(r.getServiceDurationSeconds()).append(",")
-                .append(r.getFanSpeed()).append(",")
-                .append(String.format("%.2f", r.getCurrentFee())).append(",")
-                .append(String.format("%.2f", r.getTotalFee())).append("\n");
+                        .append(r.getRequestTimeSeconds()).append(",")
+                        .append(r.getServiceStartTimeSeconds()).append(",")
+                        .append(r.getServiceEndTimeSeconds()).append(",")
+                        .append(r.getServiceDurationSeconds()).append(",")
+                        .append(r.getFanSpeed()).append(",")
+                        .append(String.format("%.2f", r.getCurrentFee())).append(",")
+                        .append(String.format("%.2f", r.getTotalFee())).append("\n");
             }
 
-            byte[] bom = new byte[]{(byte)0xEF, (byte)0xBB, (byte)0xBF};
+            byte[] bom = new byte[] { (byte) 0xEF, (byte) 0xBB, (byte) 0xBF };
             byte[] csvBytes = sb.toString().getBytes(StandardCharsets.UTF_8);
 
             byte[] result = new byte[bom.length + csvBytes.length];
@@ -350,20 +359,17 @@ public class HotelApiController {
             System.arraycopy(csvBytes, 0, result, bom.length, csvBytes.length);
 
             return ResponseEntity.ok()
-                .header("Content-Type", "text/csv; charset=UTF-8")
-                .header("Content-Disposition", "attachment; filename=detail.csv")
-                .body(result);
+                    .header("Content-Type", "text/csv; charset=UTF-8")
+                    .header("Content-Disposition", "attachment; filename=detail.csv")
+                    .body(result);
 
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(500)
-                .body("生成CSV失败".getBytes(StandardCharsets.UTF_8));
+                    .body("生成CSV失败".getBytes(StandardCharsets.UTF_8));
         }
     }
 
-    /**
-     * 使用调度器获取房间状态
-     */
     private String getRoomState(String roomId) {
         return context.scheduler.getRoomScheduleState(roomId);
     }
