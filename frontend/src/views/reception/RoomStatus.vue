@@ -33,7 +33,7 @@
 
     <el-row :gutter="20" class="room-list">
       <el-col 
-        v-for="room in rooms" 
+        v-for="room in roomsWithStatus" 
         :key="room.roomNo" 
         :xs="24" :sm="12" :md="8" :lg="6" :xl="4"
       >
@@ -178,7 +178,7 @@
       </template>
     </el-dialog>
 
-    <!-- 退房弹窗 (优化布局，修复自动退房bug) -->
+    <!-- 退房弹窗 -->
     <el-dialog 
       v-model="checkOutVisible" 
       title="账单结算 Check-Out" 
@@ -216,15 +216,14 @@
         </div>
       </div>
       
-      <!-- 底部按钮区域：左右分离 -->
+      <!-- 底部按钮区域 -->
       <template #footer>
         <div class="dialog-footer-split">
           <div class="left-group">
             <span class="group-label">导出详单：</span>
             <el-button-group>
               <el-button size="small" :icon="Document" @click="exportDetail('txt')">TXT</el-button>
-              <el-button size="small" :icon="Document" @click="exportDetail('excel')">Excel</el-button>
-              <el-button size="small" :icon="Document" @click="exportDetail('pdf')">PDF</el-button>
+              <el-button size="small" :icon="Document" @click="exportDetail('csv')">CSV</el-button>
             </el-button-group>
           </div>
           
@@ -253,23 +252,32 @@ import {
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { api } from '../../api/index.js'
-import { exportToTXT, exportToExcel, exportToPDF } from '../../utils/exportUtils.js'
 
 const rooms = ref([])
+
+const roomsWithStatus = computed(() => {
+  return rooms.value.map(room => {
+    // running 或 waiting 表示空调正在使用，房间显示为"占用"
+    const isOccupied = room.state === 'running' || room.state === 'waiting'
+    return {
+      ...room,
+      status: isOccupied ? 'occupied' : 'free'
+    }
+  })
+})
+
 const checkInVisible = ref(false)
 const checkOutVisible = ref(false)
 const selectedRoom = ref(null)
 
 const checkInForm = reactive({ roomNo: '', name: '' })
-// 增加 fullData 字段存储完整账单对象用于导出
 const currentBill = reactive({ 
   roomNo: '', 
   customerName: '',
   acFee: 0, 
   roomFee: 0,
   total: 0,
-  days: 0,
-  fullData: null 
+  days: 0
 })
 
 const occupiedCount = computed(() => 
@@ -285,8 +293,10 @@ const currentRoomRate = computed(() =>
 const fetchRooms = async () => {
   try {
     const res = await api.getSystemStatus()
+    console.log('[前台] 获取到的数据:', res.data) // 调试日志
     if (res && res.data && res.data.rooms) {
       rooms.value = res.data.rooms
+      console.log('[前台] 房间列表:', rooms.value) // 调试日志
     }
   } catch (e) { console.error(e) }
 }
@@ -311,22 +321,18 @@ const submitCheckIn = async () => {
   } catch (e) { ElMessage.error('入住办理失败') }
 }
 
-// 【关键修改】打开退房弹窗时，只获取预览，不执行退房操作
 const openCheckOut = async (room) => {
   selectedRoom.value = room
   try {
-    // 调用预览接口
     const res = await api.getBillPreview(room.roomNo)
     if(res.code === 200 && res.data) {
        const bill = res.data
        currentBill.roomNo = bill.roomNo
        currentBill.customerName = bill.customerName
-       currentBill.acFee = (bill.acFee || 0).toFixed(2)
-       currentBill.roomFee = (bill.roomFee || 0).toFixed(2)
-       currentBill.total = (bill.total || 0).toFixed(2)
-       currentBill.days = bill.checkInDays || 0
-       // 保存完整数据供导出使用
-       currentBill.fullData = bill
+       currentBill.acFee = bill.acFee
+       currentBill.roomFee = bill.roomFee
+       currentBill.total = bill.total
+       currentBill.days = bill.days || 0
        checkOutVisible.value = true
     } else {
        ElMessage.error('无法获取账单详情')
@@ -336,26 +342,45 @@ const openCheckOut = async (room) => {
   }
 }
 
-// 【关键修改】导出时使用已获取的 fullData，不调用退房接口
-const exportDetail = (format) => {
-  if (!currentBill.fullData) {
-    ElMessage.warning('账单数据未就绪')
+// 修改：调用后端导出接口
+const exportDetail = async (format) => {
+  if (!selectedRoom.value) {
+    ElMessage.warning('未选择房间')
     return
   }
   
-  const data = currentBill.fullData
+  const roomNo = selectedRoom.value.roomNo
+  
   try {
-    if (format === 'txt') exportToTXT(data)
-    else if (format === 'excel') exportToExcel(data)
-    else if (format === 'pdf') exportToPDF(data)
-    ElMessage.success(`详单已导出为 ${format.toUpperCase()} 格式`)
+    if (format === 'txt') {
+      // 调用文本账单导出接口
+      const res = await api.exportBill(roomNo)
+      const blob = new Blob([res.data], { type: 'text/plain;charset=utf-8' })
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `账单_${roomNo}.txt`
+      link.click()
+      window.URL.revokeObjectURL(url)
+      ElMessage.success('TXT账单导出成功')
+    } else if (format === 'csv') {
+      // 调用CSV详单导出接口
+      const res = await api.exportDetailCsv(roomNo)
+      const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8' })
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `详单_${roomNo}.csv`
+      link.click()
+      window.URL.revokeObjectURL(url)
+      ElMessage.success('CSV详单导出成功')
+    }
   } catch (e) {
     console.error(e)
     ElMessage.error('导出失败')
   }
 }
 
-// 确认退房：调用真正的 Checkout 接口
 const submitCheckOut = async () => {
   try {
     await api.checkOut(selectedRoom.value.roomNo)
@@ -375,7 +400,7 @@ onUnmounted(() => { if (timer) clearInterval(timer) })
 </script>
 
 <style scoped>
-/* 保持原有画风 */
+/* 保持原有样式不变 */
 .dashboard-container { padding: 30px; min-height: 100vh; background-color: #061e18; position: relative; color: #fff; font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', sans-serif; overflow-x: hidden; }
 .bg-layer-1, .bg-layer-2 { position: absolute; border-radius: 50%; filter: blur(120px); z-index: 0; pointer-events: none; }
 .bg-layer-1 { width: 60vw; height: 60vw; background: linear-gradient(135deg, #11998e, #38ef7d); opacity: 0.1; top: -20%; left: -10%; animation: float1 25s infinite alternate ease-in-out; }
@@ -416,7 +441,6 @@ onUnmounted(() => { if (timer) clearInterval(timer) })
 .action-btn { flex: 1; border-radius: 8px; transition: all 0.3s ease; }
 .action-btn:hover { transform: scale(1.05); }
 
-/* 弹窗样式调整 */
 :deep(.custom-dialog .el-dialog) { background: rgba(15, 32, 39, 0.95); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5); }
 :deep(.custom-dialog .el-dialog__header) { background: rgba(0, 0, 0, 0.2); border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding: 20px; }
 :deep(.custom-dialog .el-dialog__title) { color: #fff; font-weight: 500; font-size: 18px; }
@@ -440,7 +464,6 @@ onUnmounted(() => { if (timer) clearInterval(timer) })
 .total-row .bill-label { font-size: 17px; font-weight: bold; color: #fff; }
 .total-val { font-size: 24px !important; font-weight: bold; color: #E6A23C !important; }
 
-/* 底部按钮分离布局优化 */
 .dialog-footer-split {
   display: flex;
   justify-content: space-between;
