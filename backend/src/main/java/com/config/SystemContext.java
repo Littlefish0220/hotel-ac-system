@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 
 import com.controller.AcController;
 import com.controller.CustomerController;
+import com.model.entity.ACMode;
 import com.model.entity.Room;
 import com.repository.AcBillRepository;
 import com.repository.AcDetailRecordRepository;
@@ -53,8 +54,8 @@ public class SystemContext {
     public AcBillingService billingService;
     public AcReportService acReportService;
 
-    // 系统时钟（分钟）
     public int globalTimeCounter = 0;
+    public ACMode systemMode = ACMode.COOLING;
 
     @PostConstruct
     public void init() {
@@ -63,10 +64,14 @@ public class SystemContext {
         System.out.println("系统上下文初始化完成");
     }
 
-    public synchronized void resetSystem() {
+    /**
+     * ★ 新增：切换模式并重新初始化房间
+     */
+    public synchronized void switchModeAndReset(ACMode newMode) {
+        this.systemMode = newMode;
         this.globalTimeCounter = 0;
 
-        // 1. Repository 初始化
+        // 重新初始化所有Repository
         this.roomRepository = new InMemoryRoomRepository();
         this.customerRepository = new InMemoryCustomerRepository();
         this.orderRepository = new InMemoryAccommodationOrderRepository();
@@ -74,29 +79,10 @@ public class SystemContext {
         this.detailRepo = new InMemoryAcDetailRecordRepository();
         this.acBillRepo = new InMemoryAcBillRepository();
 
-        // 2. 初始化房间（对应测试用例配置）
-        // ★ 修改：设置入住天数为0（不再设置checkInTime）
-        Room room101 = new Room("101", 32.0, 100.0);
-        room101.setCheckInDays(0);
-        roomRepository.save(room101);
+        // 根据模式初始化房间温度
+        initializeRoomsForMode(newMode);
 
-        Room room102 = new Room("102", 28.0, 125.0);
-        room102.setCheckInDays(0);
-        roomRepository.save(room102);
-
-        Room room103 = new Room("103", 30.0, 150.0);
-        room103.setCheckInDays(0);
-        roomRepository.save(room103);
-
-        Room room104 = new Room("104", 29.0, 200.0);
-        room104.setCheckInDays(0);
-        roomRepository.save(room104);
-
-        Room room105 = new Room("105", 35.0, 100.0);
-        room105.setCheckInDays(0);
-        roomRepository.save(room105);
-
-        // 3. Service 初始化
+        // 重新初始化服务和调度器
         TemperatureModel temperatureModel = new TemperatureModel();
         this.billingService = new AcBillingServiceImpl(detailRepo, acBillRepo);
         this.scheduler = new DefaultScheduler(roomRepository, temperatureModel, billingService);
@@ -107,15 +93,100 @@ public class SystemContext {
         this.acReportService = new AcReportServiceImpl(detailRepo, acBillRepo);
         this.checkoutService = new CheckoutServiceImpl(roomRepository, billService, billingService, acReportService);
 
-        // 4. Controller 初始化
         this.acController = new AcController(acService);
         this.customerController = new CustomerController(customerService);
 
-        // ★ 修改点2：清空计费数据
         if (this.billingService instanceof AcBillingServiceImpl) {
             ((AcBillingServiceImpl) this.billingService).clearAll();
         }
 
-        System.out.println("系统已重置：5个房间初始化完成");
+        System.out.println("系统模式切换完成：模式=" + this.systemMode + "，房间已重新初始化");
+    }
+
+    /**
+     * ★ 新增：根据模式初始化房间
+     */
+    private void initializeRoomsForMode(ACMode mode) {
+        if (mode == ACMode.HEATING) {
+            // 制热模式：低温初始化
+            Room room101 = new Room("101", 10.0, 100.0);
+            room101.setCheckInDays(0);
+            roomRepository.save(room101);
+
+            Room room102 = new Room("102", 15.0, 125.0);
+            room102.setCheckInDays(0);
+            roomRepository.save(room102);
+
+            Room room103 = new Room("103", 18.0, 150.0);
+            room103.setCheckInDays(0);
+            roomRepository.save(room103);
+
+            Room room104 = new Room("104", 12.0, 200.0);
+            room104.setCheckInDays(0);
+            roomRepository.save(room104);
+
+            Room room105 = new Room("105", 14.0, 100.0);
+            room105.setCheckInDays(0);
+            roomRepository.save(room105);
+
+            System.out.println("制热模式：房间初始温度设置为低温（10-18℃）");
+        } else {
+            // 制冷模式：高温初始化
+            Room room101 = new Room("101", 32.0, 100.0);
+            room101.setCheckInDays(0);
+            roomRepository.save(room101);
+
+            Room room102 = new Room("102", 28.0, 125.0);
+            room102.setCheckInDays(0);
+            roomRepository.save(room102);
+
+            Room room103 = new Room("103", 30.0, 150.0);
+            room103.setCheckInDays(0);
+            roomRepository.save(room103);
+
+            Room room104 = new Room("104", 29.0, 200.0);
+            room104.setCheckInDays(0);
+            roomRepository.save(room104);
+
+            Room room105 = new Room("105", 35.0, 100.0);
+            room105.setCheckInDays(0);
+            roomRepository.save(room105);
+
+            System.out.println("制冷模式：房间初始温度设置为高温（28-35℃）");
+        }
+    }
+
+    public synchronized void resetSystem() {
+        this.globalTimeCounter = 0;
+        this.systemMode = ACMode.COOLING;
+
+        this.roomRepository = new InMemoryRoomRepository();
+        this.customerRepository = new InMemoryCustomerRepository();
+        this.orderRepository = new InMemoryAccommodationOrderRepository();
+        this.accommodationBillRepository = new InMemoryAccommodationBillRepository();
+        this.detailRepo = new InMemoryAcDetailRecordRepository();
+        this.acBillRepo = new InMemoryAcBillRepository();
+
+        // 默认使用制冷模式初始化
+        initializeRoomsForMode(ACMode.COOLING);
+
+        TemperatureModel temperatureModel = new TemperatureModel();
+        this.billingService = new AcBillingServiceImpl(detailRepo, acBillRepo);
+        this.scheduler = new DefaultScheduler(roomRepository, temperatureModel, billingService);
+
+        AcService acService = new AcServiceImpl(roomRepository, scheduler);
+        CustomerService customerService = new CustomerServiceImpl(customerRepository, roomRepository, orderRepository);
+        this.billService = new BillServiceImpl(roomRepository, orderRepository, accommodationBillRepository);
+        this.acReportService = new AcReportServiceImpl(detailRepo, acBillRepo);
+        this.checkoutService = new CheckoutServiceImpl(roomRepository, billService, billingService, acReportService);
+
+        this.acController = new AcController(acService);
+        this.customerController = new CustomerController(customerService);
+
+        if (this.billingService instanceof AcBillingServiceImpl) {
+            ((AcBillingServiceImpl) this.billingService).clearAll();
+        }
+
+        System.out.println("系统已重置：5个房间初始化完成，模式=" + this.systemMode);
     }
 }
