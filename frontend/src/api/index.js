@@ -66,6 +66,21 @@ export const api = {
     }
   },
 
+  // ★ 新增：切换系统模式
+  changeSystemMode: async (mode) => {
+    if (USE_MOCK) {
+      // Mock 模式下的模拟实现
+      return { data: { code: 200, msg: '模式切换成功', mode } };
+    }
+    try {
+      const response = await axios.post('/system/mode', { mode });
+      return response;
+    } catch (error) {
+      console.error('模式切换失败:', error);
+      throw error;
+    }
+  },
+
   // 前台入住
   checkIn: async (roomNo, customerName) => {
     if (USE_MOCK) {
@@ -120,5 +135,18 @@ export const api = {
       console.error('获取详单失败:', error);
       throw error;
     }
+  },
+
+
+  exportBill: (roomNo) => {
+    return axios.get(`${BASE_URL}/export/bill/${roomNo}`, {
+      responseType: 'text'
+    })
+  },
+  // 导出CSV详单
+  exportDetailCsv: (roomNo) => {
+    return axios.get(`${BASE_URL}/export/detail/${roomNo}`, {
+      responseType: 'blob'
+    })
   }
 };
