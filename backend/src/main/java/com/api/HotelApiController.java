@@ -302,7 +302,6 @@ public class HotelApiController {
             }
             String printTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
 
-            // 拼接文本
             StringBuilder sb = new StringBuilder();
             sb.append("=== 波普特酒店 - 结账单 ===\n");
             sb.append("打印时间: ").append(printTime).append("\n");
