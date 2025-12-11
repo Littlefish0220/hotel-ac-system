@@ -3,6 +3,7 @@
     <div class="bg-layer-1"></div>
     <div class="bg-layer-2"></div>
 
+    <!-- 顶部区域 -->
     <div class="header-section">
       <div class="title-box">
         <h2>系统监控中心</h2>
@@ -12,19 +13,44 @@
       <div class="test-controls">
          <div class="time-display glass-box">
             <el-icon :class="{ 'icon-spin': isTestRunning }"><Timer /></el-icon>
-            <span class="label">Sim Time: </span>
+            <span class="label">Sim Time:</span>
             <span class="value">{{ timeMinute }} min</span>
          </div>
-         <el-button 
-            :type="isTestRunning ? 'warning' : 'danger'" 
-            :loading="isTestRunning" 
-            @click="isTestRunning ? stopTest() : startTest()"
-            round
-            plain
-            class="action-btn"
-         >
-            {{ isTestRunning ? '停止测试' : '启动验收测试' }}
-         </el-button>
+         
+         <div class="test-action-group">
+           <el-select 
+             v-model="selectedScenario" 
+             placeholder="选择测试场景"
+             size="default"
+             :disabled="isTestRunning"
+             class="scenario-selector"
+             popper-class="glass-select-dropdown"
+           >
+             <el-option label="制冷模式测试" value="cool">
+               <span class="option-content">
+                 <span class="option-icon">❄️</span>
+                 <span>制冷模式测试</span>
+               </span>
+             </el-option>
+             <el-option label="制热模式测试" value="heat">
+               <span class="option-content">
+                 <span class="option-icon">🔥</span>
+                 <span>制热模式测试</span>
+               </span>
+             </el-option>
+           </el-select>
+           
+           <el-button 
+              :type="isTestRunning ? 'warning' : 'danger'" 
+              :loading="isTestRunning" 
+              @click="isTestRunning ? stopTest() : startTest()"
+              size="default"
+              round
+              class="action-btn"
+           >
+              {{ isTestRunning ? '停止测试' : '启动验收测试' }}
+           </el-button>
+         </div>
       </div>
 
       <div class="header-status">
@@ -38,27 +64,29 @@
     <!-- 进度条 -->
     <div class="time-progress-bar" v-if="isTestRunning">
       <div class="progress-info">
-        <span>Next Minute Update</span>
+        <span>下一分钟更新</span>
         <span>{{ (10 - (progressValue / 10)).toFixed(1) }}s</span>
       </div>
       <el-progress 
         :percentage="progressValue" 
-        :stroke-width="4" 
+        :stroke-width="6" 
         :show-text="false" 
         color="#E6A23C"
         class="custom-progress"
       />
     </div>
 
+    <!-- 控制面板 -->
     <el-card class="control-panel glass-panel" shadow="never">
       <div class="panel-header">
         <div class="header-left">
-          <el-icon :size="20" color="#11998e"><Monitor /></el-icon>
+          <el-icon :size="22" color="#11998e"><Monitor /></el-icon>
           <span class="panel-title">主控操作台</span>
         </div>
         <el-button 
           :type="isSystemOn ? 'danger' : 'primary'" 
           :color="isSystemOn ? '#F56C6C' : '#11998e'"
+          size="default"
           round
           :icon="SwitchButton"
           @click="toggleSystem"
@@ -69,20 +97,36 @@
       </div>
 
       <div class="params-row" :class="{ 'disabled': !isSystemOn }">
-        <div class="param-group">
+        <div class="param-group mode-switcher">
           <span class="label">工作模式</span>
-          <el-radio-group v-model="currentMode" size="small" fill="#11998e">
-            <el-radio-button label="cool">制冷 Cool</el-radio-button>
-            <el-radio-button label="heat">制热 Heat</el-radio-button>
-          </el-radio-group>
+          <div class="mode-toggle-wrapper">
+            <div 
+              class="mode-toggle" 
+              :class="{ 'heat-active': currentMode === 'heat' }"
+              @click="toggleMode"
+            >
+              <div class="mode-option cool" :class="{ active: currentMode === 'cool' }">
+                <span class="mode-icon">❄️</span>
+                <span class="mode-text">制冷</span>
+              </div>
+              <div class="mode-option heat" :class="{ active: currentMode === 'heat' }">
+                <span class="mode-icon">🔥</span>
+                <span class="mode-text">制热</span>
+              </div>
+              <div class="mode-slider" :class="currentMode"></div>
+            </div>
+            <span class="mode-hint">{{ currentMode === 'cool' ? '制冷模式' : '制热模式' }}</span>
+          </div>
         </div>
+        
         <div class="divider-vertical"></div>
+        
         <div class="param-group">
           <span class="label">最大服务数</span>
           <el-input-number 
             v-model="maxLimit" 
             :min="1" :max="10" 
-            size="small" 
+            size="default" 
             controls-position="right"
             class="glass-input"
           />
@@ -91,24 +135,38 @@
       </div>
     </el-card>
 
+    <!-- 监控内容区 -->
     <div class="monitor-content" :class="{ 'offline-mode': !isSystemOn }">
       <div class="dashboard-side">
         <div class="dash-card glass-panel">
           <div class="dash-icon-box green-bg">
-            <el-icon><WindPower /></el-icon>
+            <el-icon :size="28"><WindPower /></el-icon>
           </div>
           <div class="dash-info">
-            <div class="dash-label">服务队列 (Running)</div>
+            <div class="dash-label">服务队列</div>
             <div class="dash-num green">{{ runningCount }}</div>
           </div>
         </div>
+        
         <div class="dash-card glass-panel">
           <div class="dash-icon-box yellow-bg">
-            <el-icon><Timer /></el-icon>
+            <el-icon :size="28"><Timer /></el-icon>
           </div>
           <div class="dash-info">
-            <div class="dash-label">等待队列 (Waiting)</div>
+            <div class="dash-label">等待队列</div>
             <div class="dash-num yellow">{{ waitingCount }}</div>
+          </div>
+        </div>
+        
+        <div class="dash-card glass-panel mode-status-card">
+          <div class="dash-icon-box" :class="currentMode === 'cool' ? 'cool-bg' : 'heat-bg'">
+            <span class="mode-emoji">{{ currentMode === 'cool' ? '❄️' : '🔥' }}</span>
+          </div>
+          <div class="dash-info">
+            <div class="dash-label">运行模式</div>
+            <div class="dash-num" :class="currentMode === 'cool' ? 'blue' : 'red'">
+              {{ currentMode === 'cool' ? '制冷' : '制热' }}
+            </div>
           </div>
         </div>
       </div>
@@ -121,15 +179,15 @@
 
         <el-table 
           :data="rooms" 
-          style="width: 100%; --el-table-border-color: rgba(255,255,255,0.1); --el-table-bg-color: transparent; --el-table-tr-bg-color: transparent; --el-table-header-bg-color: transparent;"
-          height="450"
-          :header-cell-style="{ background: 'rgba(0,0,0,0.2)', color: '#a6b0c2', borderBottom: '1px solid rgba(255,255,255,0.05)' }"
-          :cell-style="{ background: 'transparent', color: '#e5eaf3', borderBottom: '1px solid rgba(255,255,255,0.05)' }"
-          :row-style="{ background: 'transparent' }"
+          style="width: 100%;"
+          height="480"
+          :header-cell-style="headerCellStyle"
+          :cell-style="cellStyle"
+          :row-style="rowStyle"
         >
-           <el-table-column prop="roomNo" label="房间" width="80" fixed>
+           <el-table-column prop="roomNo" label="房间" width="90" fixed>
             <template #default="scope">
-              <span style="font-weight: bold; font-size: 16px; color: #11998e">{{ scope.row.roomNo }}</span>
+              <span class="room-no">{{ scope.row.roomNo }}</span>
             </template>
           </el-table-column>
           
@@ -137,45 +195,60 @@
             <template #default="scope">
               <div class="status-tag" :class="scope.row.state">
                 <span class="dot"></span>
-                {{ getStatusText(scope.row.state) }}
+                <span>{{ getStatusText(scope.row.state) }}</span>
               </div>
             </template>
           </el-table-column>
 
           <el-table-column label="风速" width="100">
             <template #default="scope">
-              <el-tag v-if="scope.row.fanSpeed === 'HIGH'" type="danger" effect="dark" size="small" color="#F56C6C" style="border: none;">高速 HIGH</el-tag>
-              <el-tag v-else-if="scope.row.fanSpeed === 'MEDIUM'" type="warning" effect="dark" size="small" color="#E6A23C" style="border: none;">中速 MEDIUM</el-tag>
-              <el-tag v-else-if="scope.row.fanSpeed === 'LOW'" type="success" effect="dark" size="small" color="#67C23A" style="border: none;">低速 LOW</el-tag>
-              <span v-else style="color: #666">-</span>
+              <el-tag v-if="scope.row.fanSpeed === 'HIGH'" type="danger" effect="dark" size="small">高速</el-tag>
+              <el-tag v-else-if="scope.row.fanSpeed === 'MEDIUM'" type="warning" effect="dark" size="small">中速</el-tag>
+              <el-tag v-else-if="scope.row.fanSpeed === 'LOW'" type="success" effect="dark" size="small">低速</el-tag>
+              <span v-else class="no-data">-</span>
             </template>
           </el-table-column>
           
-          <el-table-column prop="currentTemp" label="室温" width="80">
-            <template #default="scope"><span class="font-mono">{{ scope.row.currentTemp }}°</span></template>
+          <el-table-column label="初始温度" width="100">
+            <template #default="scope">
+              <span class="temp-value initial">{{ scope.row.initialTemp }}°</span>
+            </template>
           </el-table-column>
-          <el-table-column prop="targetTemp" label="目标" width="80">
-             <template #default="scope"><span class="font-mono" style="color: #8ebfba">{{ scope.row.targetTemp }}°</span></template>
+          
+          <el-table-column prop="currentTemp" label="当前温度" width="100">
+            <template #default="scope">
+              <span class="temp-value current">{{ scope.row.currentTemp }}°</span>
+            </template>
+          </el-table-column>
+          
+          <el-table-column prop="targetTemp" label="目标温度" width="100">
+             <template #default="scope">
+               <span class="temp-value target">{{ scope.row.targetTemp }}°</span>
+             </template>
           </el-table-column>
 
           <el-table-column label="入住天数" width="100">
             <template #default="scope">
-              <span style="color: #67C23A; font-weight: bold;">{{ scope.row.checkInDays || 0 }} 天</span>
+              <span class="days-value">{{ scope.row.checkInDays || 0 }} 天</span>
             </template>
           </el-table-column>
 
           <el-table-column label="本次消费" width="110">
-            <template #default="scope"><span style="color: #409EFF;">¥ {{ (scope.row.sessionFee || 0).toFixed(2) }}</span></template>
+            <template #default="scope">
+              <span class="fee-value session">¥ {{ (scope.row.sessionFee || 0).toFixed(2) }}</span>
+            </template>
           </el-table-column>
 
           <el-table-column label="累计总费" sortable min-width="110">
             <template #default="scope">
-              <span style="color: #E6A23C; font-weight: bold;">¥ {{ (scope.row.fee || 0).toFixed(2) }}</span>
+              <span class="fee-value total">¥ {{ (scope.row.fee || 0).toFixed(2) }}</span>
             </template>
           </el-table-column>
 
-          <el-table-column label="时长" width="90">
-            <template #default="scope"><span style="font-size: 12px; color: #909399;">{{ formatDuration(scope.row.serviceDuration) }}</span></template>
+          <el-table-column label="服务时长" width="100">
+            <template #default="scope">
+              <span class="duration-value">{{ formatDuration(scope.row.serviceDuration) }}</span>
+            </template>
           </el-table-column>
         </el-table>
       </div>
@@ -184,11 +257,12 @@
 </template>
 
 <script setup>
-import { reactive, computed, ref, onMounted, onUnmounted } from 'vue'
+import { reactive, computed, ref, onMounted, onUnmounted, watch } from 'vue'
 import { SwitchButton, Refresh, Monitor, WindPower, Timer } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '../../api/index.js' 
-import { TEST_SCENARIO } from '../../api/testCases.js' 
+import { TEST_SCENARIO } from '../../api/testCases.js'
+import { TEST_SCENARIO_HEAT } from '../../api/testCasesHeat.js'
 
 const rooms = ref([])
 const isSystemOn = ref(true)
@@ -196,18 +270,44 @@ const currentMode = ref('cool')
 const maxLimit = ref(3)
 const timeMinute = ref(0)
 const isTestRunning = ref(false)
-const progressValue = ref(0) 
+const progressValue = ref(0)
+const selectedScenario = ref('cool')
 
 const runningCount = computed(() => rooms.value.filter(r => r.state === 'running').length)
 const waitingCount = computed(() => rooms.value.filter(r => r.state === 'waiting').length)
+
+const currentTestScenario = computed(() => {
+  return selectedScenario.value === 'heat' ? TEST_SCENARIO_HEAT : TEST_SCENARIO
+})
+
+const headerCellStyle = {
+  background: 'rgba(0,0,0,0.3)',
+  color: '#a6b0c2',
+  borderBottom: '1px solid rgba(255,255,255,0.08)',
+  fontSize: '13px',
+  fontWeight: '500'
+}
+
+const cellStyle = {
+  background: 'transparent',
+  color: '#e5eaf3',
+  borderBottom: '1px solid rgba(255,255,255,0.05)',
+  fontSize: '13px'
+}
+
+const rowStyle = {
+  background: 'transparent'
+}
+
 const getStatusText = (state) => { 
   const map = { 'running': '运行', 'waiting': '等待', 'standby': '待机', 'off': '关机' }
   return map[state] || state 
 }
+
 const formatDuration = (seconds) => { 
   if (!seconds || seconds <= 0) return '-'
   const mins = Math.floor(seconds / 60)
-  return `${mins}m` 
+  return `${mins}分钟` 
 }
 
 const fetchData = async () => {
@@ -242,25 +342,61 @@ const toggleSystem = () => {
   }
 }
 
-let testTimer = null
-let progressTimer = null
-
-const processStepsForTime = async (targetTime) => {
-  console.log(`>>> Executing Actions for SimTime: ${targetTime} min`)
-
-  const actions = TEST_SCENARIO.filter(item => item.timeOffset === targetTime)
-  for (const act of actions) {
-    await api.controlRoom(act.roomNo, { 
-      action: act.action, 
-      targetTemp: act.targetTemp,
-      fanSpeed: act.fanSpeed
-    })
+const toggleMode = async () => {
+  if (isTestRunning.value) {
+    ElMessage.warning('测试运行中，无法切换模式')
+    return
+  }
+  
+  const newMode = currentMode.value === 'cool' ? 'heat' : 'cool'
+  
+  try {
+    await ElMessageBox.confirm(
+      `切换到${newMode === 'cool' ? '制冷' : '制热'}模式将重新初始化所有房间温度，是否继续？`, 
+      '模式切换确认', 
+      {
+        confirmButtonText: '确认切换', 
+        cancelButtonText: '取消', 
+        type: 'warning',
+      }
+    )
+    
+    await api.changeSystemMode(newMode)
+    currentMode.value = newMode
+    await fetchData()
+    ElMessage.success(`已切换为${newMode === 'cool' ? '制冷' : '制热'}模式，房间温度已重新初始化`)
+  } catch (e) {
+    if (e !== 'cancel') {
+      ElMessage.error('模式切换失败')
+      console.error(e)
+    }
   }
 }
 
-// 【关键修改】计算最大测试时间
+let testTimer = null
+let progressTimer = null
+const processStepsForTime = async (targetTime) => {
+  console.log(`>>> Executing Actions for SimTime: ${targetTime} min`)
+
+  const actions = currentTestScenario.value.filter(item => item.timeOffset === targetTime)
+  
+  for (const act of actions) {
+    if (act.action === 'checkIn') {
+      console.log(`[入住] 房间 ${act.roomNo}，顾客：${act.customerName}`)
+      const res = await api.checkIn(act.roomNo, act.customerName)
+      console.log('[入住API返回]', res)  // ★ 添加日志
+    } else {
+      await api.controlRoom(act.roomNo, { 
+        action: act.action, 
+        targetTemp: act.targetTemp,
+        fanSpeed: act.fanSpeed
+      })
+    }
+  }
+}
+
 const maxScenarioTime = computed(() => {
-  return Math.max(...TEST_SCENARIO.map(item => item.timeOffset))
+  return Math.max(...currentTestScenario.value.map(item => item.timeOffset))
 })
 
 const stopTest = () => {
@@ -277,37 +413,38 @@ const startTest = async () => {
   isTestRunning.value = true
   progressValue.value = 0
   
+  const testMode = selectedScenario.value === 'heat' ? 'heat' : 'cool'
+  await api.changeSystemMode(testMode)
+  currentMode.value = testMode
+  
   await fetchData()
   let localNextTime = 0 
 
-  ElMessage.success(`验收测试开始，共 ${maxScenarioTime.value + 1} 分钟用例`)
+  ElMessage.success(`验收测试开始（${selectedScenario.value === 'heat' ? '制热模式' : '制冷模式'}），共 ${maxScenarioTime.value + 1} 分钟用例`)
 
-  // t=0: 执行初始操作（开机等）
   await processStepsForTime(0)
   await fetchData()
 
   const loop = async () => {
-      localNextTime += 1
-      
-      // ★ 修改：测试用例结束后1分钟自动停止（而非5分钟）
-      if (localNextTime > maxScenarioTime.value + 1) { 
-        stopTest()
-        ElMessage.success({
-          message: '所有测试用例执行完毕！测试已自动结束。',
-          type: 'success',
-          duration: 5000,
-          showClose: true
-        })
-        return
-      }
-      
-      console.log(`\n========== 时间推进到 t=${localNextTime} ==========`)
-      await api.sendTimeTick()
-      await processStepsForTime(localNextTime)
-      await fetchData()
-      progressValue.value = 0
+    localNextTime += 1
+    
+    if (localNextTime > maxScenarioTime.value + 1) { 
+      stopTest()
+      ElMessage.success({
+        message: '所有测试用例执行完毕！测试已自动结束。',
+        type: 'success',
+        duration: 5000,
+        showClose: true
+      })
+      return
+    }
+    
+    console.log(`\n========== 时间推进到 t=${localNextTime} ==========`)
+    await api.sendTimeTick()
+    await processStepsForTime(localNextTime)
+    await fetchData()
+    progressValue.value = 0
   }
-
 
   testTimer = setInterval(loop, 10000)
   progressTimer = setInterval(() => {
@@ -316,7 +453,6 @@ const startTest = async () => {
     }
   }, 100)
 }
-
 
 let autoRefreshTimer = null
 onMounted(() => {
@@ -332,73 +468,755 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* 样式与原版保持一致，略微调整布局 */
-.monitor-container { padding: 30px; min-height: 100vh; background-color: #061e18; position: relative; overflow: hidden; color: #fff; font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', sans-serif; }
-.bg-layer-1, .bg-layer-2 { position: absolute; border-radius: 50%; filter: blur(120px); z-index: 0; pointer-events: none; }
-.bg-layer-1 { width: 60vw; height: 60vw; background: linear-gradient(135deg, #11998e, #38ef7d); opacity: 0.1; top: -20%; left: -10%; animation: float1 25s infinite alternate ease-in-out; }
-.bg-layer-2 { width: 50vw; height: 50vw; background: linear-gradient(135deg, #0f2027, #2c5364); opacity: 0.15; bottom: -20%; right: -10%; animation: float2 30s infinite alternate-reverse ease-in-out; }
-@keyframes float1 { 0% { transform: translate(0,0); } 100% { transform: translate(10vw, 5vh); } }
-@keyframes float2 { 0% { transform: translate(0,0); } 100% { transform: translate(-10vw, -5vh); } }
-.glass-panel { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2); border-radius: 16px; color: #E5EAF3; margin-bottom: 24px; }
-:deep(.el-card) { background-color: transparent; border: none; color: inherit; }
-:deep(.el-card__body) { background-color: transparent; }
-:deep(.glass-input .el-input__wrapper) { background-color: rgba(0,0,0,0.3) !important; box-shadow: none !important; border: 1px solid rgba(255,255,255,0.1); }
-:deep(.glass-input .el-input__inner) { color: #fff !important; }
-:deep(.el-input-number__decrease), :deep(.el-input-number__increase), :deep(.el-input-group__append) { background-color: rgba(255,255,255,0.1) !important; border-left: 1px solid rgba(255,255,255,0.1) !important; border-right: 1px solid rgba(255,255,255,0.1) !important; color: #a6b0c2 !important; box-shadow: none !important; }
-:deep(.el-radio-button__inner) { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: #ccc; }
-:deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) { background-color: #11998e; border-color: #11998e; color: white; box-shadow: none; }
-.header-section { position: relative; z-index: 10; display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-.title-box h2 { font-size: 28px; margin: 0; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
-.title-box p { margin: 5px 0 0; color: #8ebfba; font-size: 12px; letter-spacing: 2px; }
-.status-indicator { display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 20px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); }
-.indicator-dot { width: 8px; height: 8px; border-radius: 50%; background: #909399; }
-.active .indicator-dot { background: #67C23A; box-shadow: 0 0 10px #67C23A; }
-.active span { color: #67C23A; }
-.control-panel { padding: 10px; }
-.panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 15px; }
-.header-left { display: flex; align-items: center; gap: 10px; }
-.panel-title { font-size: 18px; font-weight: 500; }
-.params-row { display: flex; align-items: center; gap: 30px; flex-wrap: wrap; transition: all 0.3s; }
-.params-row.disabled { opacity: 0.4; pointer-events: none; filter: grayscale(100%); }
-.param-group { display: flex; align-items: center; gap: 12px; }
-.label { color: #a6b0c2; font-size: 14px; }
-.unit { font-size: 12px; color: #606266; }
-.divider-vertical { width: 1px; height: 20px; background: rgba(255,255,255,0.1); }
-.monitor-content { display: flex; gap: 24px; position: relative; z-index: 10; transition: all 0.5s ease; }
-.dashboard-side { flex: 1; display: flex; flex-direction: column; gap: 20px; min-width: 240px; }
-.dash-card { display: flex; align-items: center; padding: 20px; gap: 20px; transition: transform 0.3s; }
-.dash-card:hover { transform: translateX(5px); background: rgba(255,255,255,0.08); }
-.dash-icon-box { width: 50px; height: 50px; border-radius: 12px; display: flex; justify-content: center; align-items: center; font-size: 24px; }
-.green-bg { background: rgba(103, 194, 58, 0.2); color: #67C23A; }
-.yellow-bg { background: rgba(230, 162, 60, 0.2); color: #E6A23C; }
-.dash-info { display: flex; flex-direction: column; }
-.dash-label { font-size: 12px; color: #a6b0c2; margin-bottom: 4px; }
-.dash-num { font-size: 28px; font-weight: bold; }
-.dash-num.green { color: #67C23A; } .dash-num.yellow { color: #E6A23C; }
-.table-container { flex: 3; padding: 20px; overflow: hidden; }
-.table-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-.table-title { font-size: 16px; font-weight: 500; border-left: 3px solid #11998e; padding-left: 10px; }
-.font-mono { font-family: monospace; }
-.status-tag { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
-.dot { width: 6px; height: 6px; border-radius: 50%; }
-.status-tag.running { color: #67C23A; } .status-tag.running .dot { background: #67C23A; box-shadow: 0 0 5px #67C23A; }
-.status-tag.waiting { color: #E6A23C; } .status-tag.waiting .dot { background: #E6A23C; animation: blink 1.5s infinite; }
-.status-tag.off { color: #909399; } .status-tag.off .dot { background: #909399; }
-.status-tag.standby { color: #409EFF; } .status-tag.standby .dot { background: #409EFF; }
-@keyframes blink { 50% { opacity: 0.5; } }
-:deep(.el-table--enable-row-hover .el-table__body tr:hover > td) { background-color: rgba(255, 255, 255, 0.08) !important; }
-:deep(.el-table__inner-wrapper::before) { display: none; }
-.offline-mode { filter: grayscale(100%); opacity: 0.6; pointer-events: none; user-select: none; }
-.test-controls { display: flex; align-items: center; gap: 15px; z-index: 20; }
-.glass-box { background: rgba(0,0,0,0.3); padding: 5px 15px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; gap: 8px; }
-.glass-box .label { color: #aaa; font-size: 12px; }
-.glass-box .value { color: #E6A23C; font-weight: bold; font-family: monospace; font-size: 16px; }
-.icon-spin { animation: rotate 2s linear infinite; }
-@keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-.time-progress-bar { margin-bottom: 20px; background: rgba(0,0,0,0.2); padding: 10px 20px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); animation: fadeIn 0.5s ease-out; }
-.progress-info { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 12px; color: #888; }
-:deep(.custom-progress .el-progress-bar__outer) { background-color: rgba(255,255,255,0.1) !important; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-.power-btn { transition: all 0.3s ease; } .power-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
-.action-btn { transition: all 0.3s ease; } .action-btn:hover { transform: scale(1.05); }
+/* 基础容器 */
+.monitor-container {
+  padding: 24px 32px;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0a1f1a 0%, #061e18 100%);
+  position: relative;
+  overflow: hidden;
+  color: #fff;
+  font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+/* 背景动画层 */
+.bg-layer-1, .bg-layer-2 {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(140px);
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.08;
+}
+
+.bg-layer-1 {
+  width: 65vw;
+  height: 65vw;
+  background: linear-gradient(135deg, #11998e, #38ef7d);
+  top: -25%;
+  left: -15%;
+  animation: float1 30s infinite alternate ease-in-out;
+}
+
+.bg-layer-2 {
+  width: 55vw;
+  height: 55vw;
+  background: linear-gradient(135deg, #0f2027, #2c5364);
+  bottom: -25%;
+  right: -15%;
+  animation: float2 35s infinite alternate-reverse ease-in-out;
+}
+
+@keyframes float1 {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(8vw, 4vh) scale(1.1); }
+}
+
+@keyframes float2 {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(-8vw, -4vh) scale(1.1); }
+}
+
+/* 玻璃态面板 */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  border-radius: 20px;
+  color: #E5EAF3;
+  margin-bottom: 20px;
+}
+
+:deep(.el-card) {
+  background-color: transparent;
+  border: none;
+  color: inherit;
+}
+
+:deep(.el-card__body) {
+  background-color: transparent;
+  padding: 24px;
+}
+
+/* 顶部区域 */
+.header-section {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding: 0 4px;
+}
+
+.title-box h2 {
+  font-size: 32px;
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.6);
+  background: linear-gradient(135deg, #11998e, #38ef7d);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.title-box p {
+  margin: 6px 0 0;
+  color: #7a9d96;
+  font-size: 11px;
+  letter-spacing: 3px;
+  font-weight: 500;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  border-radius: 24px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  transition: all 0.3s ease;
+}
+
+.indicator-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #606266;
+  transition: all 0.3s ease;
+}
+
+.status-indicator.active .indicator-dot {
+  background: #67C23A;
+  box-shadow: 0 0 12px #67C23A, 0 0 24px rgba(103, 194, 58, 0.4);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.1); opacity: 0.8; }
+}
+
+.status-indicator.active span {
+  color: #67C23A;
+  font-weight: 500;
+}
+
+/* 测试控制区 */
+.test-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  z-index: 20;
+}
+
+.glass-box {
+  background: rgba(0,0,0,0.35);
+  padding: 8px 18px;
+  border-radius: 24px;
+  border: 1px solid rgba(255,255,255,0.12);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.glass-box .label {
+  color: #999;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.glass-box .value {
+  color: #E6A23C;
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
+  font-size: 17px;
+  letter-spacing: 1px;
+}
+
+.icon-spin {
+  animation: rotate 2s linear infinite;
+}
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.test-action-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(0, 0, 0, 0.2) !important;  /* ★ 降低背景深度 */
+  padding: 8px 12px;
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+.scenario-selector {
+  width: 180px;
+}
+:deep(.scenario-selector .el-input__wrapper) {
+  background-color: rgba(0, 0, 0, 0.25) !important;
+  box-shadow: none !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 18px !important;
+}
+:deep(.scenario-selector .el-input__wrapper:hover) {
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  background-color: rgba(0, 0, 0, 0.35) !important;
+}
+:deep(.scenario-selector .el-input__wrapper.is-focused) {
+  background-color: rgba(0, 0, 0, 0.4) !important;
+  box-shadow: 0 0 0 1px #11998e !important;
+}
+:deep(.scenario-selector .el-input__inner) {
+  color: #fff !important;
+  font-size: 13px;
+  background: transparent !important;
+}
+:deep(.scenario-selector .el-input__prefix) {
+  display: none;  /* 隐藏前缀图标，避免影响居中 */
+}
+:deep(.scenario-selector .el-input__wrapper) {
+  background-color: rgba(0, 0, 0, 0.25) !important;
+}
+/* ★ 强制覆盖选择器内所有元素 */
+:deep(.scenario-selector *) {
+  background-color: transparent !important;
+}
+.option-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.option-icon {
+  font-size: 16px;
+}
+.action-btn {
+  transition: all 0.3s ease;
+  font-weight: 500;
+  padding: 10px 24px;
+}
+.action-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+}
+.time-progress-bar {
+  margin-bottom: 20px;
+  background: rgba(0,0,0,0.25);
+  padding: 14px 24px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.08);
+  animation: fadeIn 0.5s ease-out;
+  position: relative;
+  z-index: 10;
+}
+.progress-info {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: #999;
+  font-weight: 500;
+}
+:deep(.custom-progress .el-progress-bar__outer) {
+  background-color: rgba(255,255,255,0.12) !important;
+  border-radius: 10px;
+}
+:deep(.custom-progress .el-progress-bar__inner) {
+  border-radius: 10px;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.control-panel {
+  position: relative;
+  z-index: 10;
+}
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  padding-bottom: 18px;
+}
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.panel-title {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+.power-btn {
+  transition: all 0.3s ease;
+  font-weight: 500;
+  padding: 10px 24px;
+}
+.power-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+}
+.params-row {
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  flex-wrap: wrap;
+  transition: all 0.3s;
+}
+.params-row.disabled {
+  opacity: 0.35;
+  pointer-events: none;
+  filter: grayscale(100%);
+}
+.param-group {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.label {
+  color: #a6b0c2;
+  font-size: 14px;
+  font-weight: 500;
+  min-width: 70px;
+}
+.unit {
+  font-size: 13px;
+  color: #7a8a99;
+  font-weight: 500;
+}
+.divider-vertical {
+  width: 1px;
+  height: 48px;
+  background: rgba(255,255,255,0.12);
+}
+.mode-switcher {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+.mode-toggle-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mode-toggle {
+  position: relative;
+  display: flex;
+  background: rgba(0, 0, 0, 0.3) !important;
+  border-radius: 28px;
+  padding: 5px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+/* ★ 移除所有状态的边框和轮廓 */
+.mode-toggle,
+.mode-toggle:hover,
+.mode-toggle:focus,
+.mode-toggle:focus-visible,
+.mode-toggle:focus-within,
+.mode-toggle:active {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+.mode-toggle:hover {
+  background: rgba(0, 0, 0, 0.4) !important;
+}
+.mode-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  border-radius: 24px;
+  z-index: 1;
+  transition: all 0.3s ease;
+  color: #666;
+  position: relative;
+}
+.mode-option,
+.mode-option:hover,
+.mode-option:focus,
+.mode-option:focus-visible,
+.mode-option:active {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+}
+.mode-option.active {
+  color: #fff;
+}
+/* ★ 通配符强制移除 */
+.mode-toggle *,
+.mode-toggle *:focus,
+.mode-toggle *:focus-visible,
+.mode-toggle *::before,
+.mode-toggle *::after {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+.mode-toggle-wrapper:focus,
+.mode-toggle-wrapper:focus-visible {
+  outline: none !important;
+}
+.mode-icon {
+  font-size: 18px;
+  transition: transform 0.3s ease;
+}
+.mode-option.active .mode-icon {
+  transform: scale(1.1);
+}
+.mode-text {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+.mode-slider {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  width: calc(50% - 5px);
+  height: calc(100% - 10px);
+  border-radius: 24px;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 0;
+  background: transparent !important;
+  border: none !important;  /* ★ 添加 */
+  outline: none !important;  /* ★ 添加 */
+}
+.mode-slider.cool {
+  background: linear-gradient(135deg, #409EFF 0%, #67C23A 100%) !important;
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.5), 0 0 20px rgba(64, 158, 255, 0.2) !important;
+  border: none !important;
+}
+.mode-slider.heat {
+  transform: translateX(100%);
+  background: linear-gradient(135deg, #F56C6C 0%, #E6A23C 100%) !important;
+  box-shadow: 0 4px 12px rgba(245, 108, 108, 0.5), 0 0 20px rgba(245, 108, 108, 0.2) !important;
+  border: none !important;
+}
+.mode-hint {
+  font-size: 12px;
+  color: #7a8a99;
+  font-weight: 500;
+  padding-left: 4px;
+}
+:deep(.glass-input .el-input__wrapper) {
+  background-color: rgba(0,0,0,0.35) !important;
+  box-shadow: none !important;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+:deep(.glass-input .el-input__wrapper:hover) {
+  border-color: rgba(255,255,255,0.25);
+  background-color: rgba(0,0,0,0.45) !important;
+}
+:deep(.glass-input .el-input__inner) {
+  color: #fff !important;
+  font-weight: 500;
+}
+:deep(.el-input-number__decrease), 
+:deep(.el-input-number__increase) {
+  background-color: rgba(255,255,255,0.12) !important;
+  border: none !important;
+  color: #a6b0c2 !important;
+  transition: all 0.3s ease;
+}
+:deep(.el-input-number__decrease:hover), 
+:deep(.el-input-number__increase:hover) {
+  background-color: rgba(255,255,255,0.2) !important;
+  color: #fff !important;
+}
+.monitor-content {
+  display: flex;
+  gap: 24px;
+  position: relative;
+  z-index: 10;
+  transition: all 0.5s ease;
+}
+.offline-mode {
+  filter: grayscale(100%);
+  opacity: 0.5;
+  pointer-events: none;
+  user-select: none;
+}
+.dashboard-side {
+  flex: 0 0 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.dash-card {
+  display: flex;
+  align-items: center;
+  padding: 24px;
+  gap: 20px;
+  transition: all 0.3s ease;
+  cursor: default;
+}
+.dash-card:hover {
+  transform: translateX(6px);
+  background: rgba(255,255,255,0.08);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+.dash-icon-box {
+  width: 60px;
+  height: 60px;
+  border-radius: 16px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 28px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+.dash-card:hover .dash-icon-box {
+  transform: scale(1.05);
+}
+.green-bg {
+  background: linear-gradient(135deg, rgba(103, 194, 58, 0.25), rgba(103, 194, 58, 0.15));
+  color: #67C23A;
+}
+.yellow-bg {
+  background: linear-gradient(135deg, rgba(230, 162, 60, 0.25), rgba(230, 162, 60, 0.15));
+  color: #E6A23C;
+}
+.cool-bg {
+  background: linear-gradient(135deg, rgba(64, 158, 255, 0.25), rgba(64, 158, 255, 0.15));
+  color: #409EFF;
+}
+.heat-bg {
+  background: linear-gradient(135deg, rgba(245, 108, 108, 0.25), rgba(245, 108, 108, 0.15));
+  color: #F56C6C;
+}
+.dash-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dash-label {
+  font-size: 13px;
+  color: #a6b0c2;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+}
+.dash-num {
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -1px;
+}
+.dash-num.green { color: #67C23A; }
+.dash-num.yellow { color: #E6A23C; }
+.dash-num.blue { color: #409EFF; }
+.dash-num.red { color: #F56C6C; }
+.mode-emoji {
+  font-size: 28px;
+}
+.mode-status-card {
+  transition: all 0.3s ease;
+}
+.table-container {
+  flex: 1;
+  padding: 24px;
+  overflow: hidden;
+}
+.table-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+.table-title {
+  font-size: 17px;
+  font-weight: 600;
+  border-left: 4px solid #11998e;
+  padding-left: 12px;
+  letter-spacing: 0.5px;
+}
+:deep(.el-table) {
+  --el-table-border-color: rgba(255,255,255,0.08);
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-header-bg-color: transparent;
+}
+:deep(.el-table--enable-row-hover .el-table__body tr:hover > td) {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+}
+:deep(.el-table__inner-wrapper::before) {
+  display: none;
+}
+:deep(.el-table th.el-table__cell) {
+  padding: 14px 0;
+}
+:deep(.el-table td.el-table__cell) {
+  padding: 16px 0;
+}
+.room-no {
+  font-weight: 700;
+  font-size: 17px;
+  color: #11998e;
+  letter-spacing: 1px;
+}
+.status-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 4px 0;
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.status-tag.running { color: #67C23A; }
+.status-tag.running .dot {
+  background: #67C23A;
+  box-shadow: 0 0 8px #67C23A;
+  animation: pulse-dot 2s infinite;
+}
+.status-tag.waiting { color: #E6A23C; }
+.status-tag.waiting .dot {
+  background: #E6A23C;
+  animation: blink 1.5s infinite;
+}
+.status-tag.off { color: #909399; }
+.status-tag.off .dot { background: #909399; }
+.status-tag.standby { color: #409EFF; }
+.status-tag.standby .dot { background: #409EFF; }
+@keyframes pulse-dot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.2); opacity: 0.7; }
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.temp-value {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.5px;
+}
+.temp-value.initial { color: #909399; }
+.temp-value.current { color: #e5eaf3; }
+.temp-value.target { color: #8ebfba; }
+.days-value {
+  color: #67C23A;
+  font-weight: 600;
+  font-size: 13px;
+}
+.fee-value {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.3px;
+}
+.fee-value.session { color: #409EFF; }
+.fee-value.total { color: #E6A23C; }
+.duration-value {
+  font-size: 12px;
+  color: #909399;
+  font-weight: 500;
+}
+.no-data {
+  color: #666;
+  font-size: 13px;
+}
+:deep(.el-tag) {
+  border: none;
+  font-weight: 500;
+  padding: 4px 12px;
+  border-radius: 12px;
+}
+:deep(.el-tag--danger) {
+  background: rgba(245, 108, 108, 0.2);
+  color: #F56C6C;
+}
+:deep(.el-tag--warning) {
+  background: rgba(230, 162, 60, 0.2);
+  color: #E6A23C;
+}
+:deep(.el-tag--success) {
+  background: rgba(103, 194, 58, 0.2);
+  color: #67C23A;
+}
+@media (max-width: 1400px) {
+  .monitor-content { flex-direction: column; }
+  .dashboard-side { flex-direction: row; flex: none; }
+  .dash-card { flex: 1; }
+}
+@media (max-width: 768px) {
+  .monitor-container { padding: 16px; }
+  .header-section { flex-direction: column; gap: 16px; align-items: flex-start; }
+  .test-controls { flex-direction: column; width: 100%; }
+  .test-action-group { width: 100%; flex-direction: column; }
+  .scenario-selector { width: 100%; }
+  .dashboard-side { flex-direction: column; }
+}
+:deep(.el-table__body-wrapper)::-webkit-scrollbar { width: 8px; height: 8px; }
+:deep(.el-table__body-wrapper)::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); border-radius: 4px; }
+:deep(.el-table__body-wrapper)::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 4px; transition: background 0.3s ease; }
+:deep(.el-table__body-wrapper)::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.3); }
+</style>
+<style>
+/* ★ 全局样式：下拉框 - 完全参考登录界面 */
+.glass-select-dropdown.el-popper {
+  background: rgba(16, 36, 30, 0.95) !important;
+  backdrop-filter: blur(10px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6) !important;
+  border-radius: 12px !important;
+}
+.glass-select-dropdown.el-popper .el-popper__arrow::before {
+  background: rgba(16, 36, 30, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+/* ★ 强制覆盖下拉框内所有元素 */
+.glass-select-dropdown * {
+  background: transparent !important;
+}
+.glass-select-dropdown.el-popper {
+  background: rgba(16, 36, 30, 0.95) !important;
+}
+.glass-select-dropdown .el-select-dropdown__item {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: #ccc !important;
+  transition: all 0.3s ease !important;
+  padding: 12px 16px !important;
+  margin: 2px 8px !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+}
+.glass-select-dropdown .el-select-dropdown__item:hover,
+.glass-select-dropdown .el-select-dropdown__item.is-hovering {
+  background-color: rgba(17, 153, 142, 0.2) !important;
+  color: #fff !important;
+}
+.glass-select-dropdown .el-select-dropdown__item.is-selected {
+  color: #38ef7d !important;
+  font-weight: bold !important;
+  background-color: transparent !important;
+}
+.glass-select-dropdown .el-select-dropdown__item .option-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+}
+.glass-select-dropdown .el-select-dropdown__item.is-selected::after {
+  display: none;
+}
 </style>
