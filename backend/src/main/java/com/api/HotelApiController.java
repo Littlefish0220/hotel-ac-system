@@ -1,5 +1,8 @@
 package com.api;
 
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -8,6 +11,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -59,7 +63,7 @@ public class HotelApiController {
             data.put("status", room.isOccupied() ? "occupied" : "free");
             data.put("customerName", getCustomerName(roomId));
 
-            // ★ 修改：直接从 Room 获取入住天数
+            // 修改：直接从 Room 获取入住天数
             data.put("checkInDays", room.getCheckInDays());
 
             // 获取本次消费（当前活跃服务段的费用）
@@ -169,7 +173,7 @@ public class HotelApiController {
         try {
             Room room = context.roomRepository.findById(roomNo);
             if (room == null) {
-                return Map.of("code", 404, "msg", "房间不存在");
+                return Map.of("code", 404, "msg", "无数据");
             }
 
             // 使用计费服务获取准确费用
@@ -241,7 +245,7 @@ public class HotelApiController {
             billData.put("total", totalAcFee + roomFee);
             billData.put("checkInDays", days);
             billData.put("detailLogs", context.detailRepo.findByRoomId(roomNo));
-
+            
             context.customerController.checkOut(roomNo);
             context.detailRepo.findByRoomId(roomNo).clear();
 
@@ -263,6 +267,100 @@ public class HotelApiController {
             return Map.of("code", 200, "msg", "系统重置成功");
         } catch (Exception e) {
             return Map.of("code", 500, "msg", "重置失败");
+        }
+    }
+
+    @GetMapping(value = "/export/bill/{roomNo}", produces = "text/plain; charset=utf-8")
+    public String exportBill(@PathVariable String roomNo) {
+        try {
+            Room room = context.roomRepository.findById(roomNo);
+            if (room == null) {
+                return "无该房间记录";
+            }
+
+            // 空调费用
+            AcBillingServiceImpl billingService = (AcBillingServiceImpl) context.billingService;
+            int currentTimeSeconds = context.globalTimeCounter * 60;
+
+            double acFee = billingService.getRoomTotalFee(roomNo);
+            double sessionFee = billingService.getCurrentSessionFee(roomNo, currentTimeSeconds);
+            double totalAcFee = acFee + sessionFee;
+
+            // 房费
+            int days = room.getCheckInDays();
+            double roomFee = days * room.getPrice();
+            double total = totalAcFee + roomFee;
+
+            // 格式化字段
+            String customerName = getCustomerName(roomNo);
+            Optional<AccommodationOrder> orderOpt = context.orderRepository.findByRoomId(roomNo);
+            String checkInTime = "";
+            if (orderOpt.isPresent()) {
+                long checkInMillis = orderOpt.get().getCheckInTime();
+                checkInTime = LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(checkInMillis),
+                        java.time.ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            }
+            String printTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+
+            // 拼接文本
+            StringBuilder sb = new StringBuilder();
+            sb.append("=== 波普特酒店 - 结账单 ===\n");
+            sb.append("打印时间: ").append(printTime).append("\n");
+            sb.append("------------------------------\n");
+            sb.append("房间号  : ").append(roomNo).append("\n");
+            sb.append("住户姓名: ").append(customerName).append("\n");
+            sb.append("入住时间: ").append(checkInTime).append("\n");
+            sb.append("------------------------------\n");
+            sb.append("空调费用: ").append(String.format("%.2f", totalAcFee)).append(" 元\n");
+            sb.append("住宿费用: ").append(String.format("%.2f", roomFee))
+            .append(" 元 (").append(room.getPrice()).append("元/天 x ").append(days).append(")\n");
+            sb.append("------------------------------\n");
+            sb.append("总计应收: ").append(String.format("%.2f", total)).append(" 元\n");
+
+            return sb.toString();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "生成账单失败";
+        }
+    }
+
+    @GetMapping(value = "/export/detail/{roomNo}", produces = "text/csv; charset=utf-8")
+    public ResponseEntity<byte[]> exportDetailCsv(@PathVariable String roomNo) {
+        try {
+            List<AcDetailRecord> logs = context.detailRepo.findByRoomId(roomNo);
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("房间号,请求时间(s),服务开始时间(s),服务结束时间(s),服务时长(秒),风速,本段费用(元),累积费用(元)\n");
+
+            for (AcDetailRecord r : logs) {
+                sb.append(roomNo).append(",")
+                .append(r.getRequestTimeSeconds()).append(",")
+                .append(r.getServiceStartTimeSeconds()).append(",")
+                .append(r.getServiceEndTimeSeconds()).append(",")
+                .append(r.getServiceDurationSeconds()).append(",")
+                .append(r.getFanSpeed()).append(",")
+                .append(String.format("%.2f", r.getCurrentFee())).append(",")
+                .append(String.format("%.2f", r.getTotalFee())).append("\n");
+            }
+
+             // UTF-8 BOM
+            byte[] bom = new byte[]{(byte)0xEF, (byte)0xBB, (byte)0xBF};
+            byte[] csvBytes = sb.toString().getBytes(StandardCharsets.UTF_8);
+
+            // 拼接 BOM + CSV 内容
+            byte[] result = new byte[bom.length + csvBytes.length];
+            System.arraycopy(bom, 0, result, 0, bom.length);
+            System.arraycopy(csvBytes, 0, result, bom.length, csvBytes.length);
+
+            return ResponseEntity.ok()
+                .header("Content-Type", "text/csv; charset=UTF-8")
+                .header("Content-Disposition", "attachment; filename=detail.csv")
+                .body(result);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500)
+                .body("生成CSV失败".getBytes(StandardCharsets.UTF_8));
         }
     }
 
