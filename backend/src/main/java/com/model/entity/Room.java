@@ -7,7 +7,7 @@ public class Room {
     // 基础信息
     private String roomId;
     private double price;
-    private double initialTemperature;
+    private final double initialTemperature; // ★ 改为 final
     private double currentTemperature;
 
     // 空调相关
@@ -20,20 +20,19 @@ public class Room {
     private boolean occupied = false;
     private String currentCustomerId;
     private String currentOrderId;
-
-    // ★ 新增：入住天数（每次开机+1）
     private int checkInDays = 0;
 
     // 构造函数
     public Room() {
+        this.initialTemperature = 25.0; // ★ final 字段必须初始化
     }
 
     public Room(String roomId, double initialTemperature, double price) {
         this.roomId = roomId;
-        this.initialTemperature = initialTemperature;
+        this.initialTemperature = initialTemperature; // ✅ 构造时设置，之后不可变
         this.currentTemperature = initialTemperature;
         this.price = price;
-        this.checkInDays = 0; // ★ 初始化为0
+        this.checkInDays = 0;
     }
 
     // ============ Getters ============
@@ -102,7 +101,6 @@ public class Room {
         return currentOrderId;
     }
 
-    // ★ 新增：获取入住天数
     public int getCheckInDays() {
         return checkInDays;
     }
@@ -117,9 +115,10 @@ public class Room {
         this.price = price;
     }
 
-    public void setInitialTemperature(double initialTemperature) {
-        this.initialTemperature = initialTemperature;
-    }
+    // ★ 删除此方法（final 字段不允许 setter）
+    // public void setInitialTemperature(double initialTemperature) {
+    // this.initialTemperature = initialTemperature;
+    // }
 
     public void setCurrentTemperature(double currentTemperature) {
         this.currentTemperature = currentTemperature;
@@ -193,12 +192,10 @@ public class Room {
         }
     }
 
-    // ★ 新增：设置入住天数
     public void setCheckInDays(int days) {
         this.checkInDays = days;
     }
 
-    // ★ 新增：增加入住天数
     public void incrementCheckInDays() {
         this.checkInDays++;
     }
