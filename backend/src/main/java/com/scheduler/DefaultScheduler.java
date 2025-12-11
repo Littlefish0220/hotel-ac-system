@@ -52,13 +52,33 @@ public class DefaultScheduler implements Scheduler {
 
         allContexts.remove(roomId);
         ServiceContext ctx = new ServiceContext(roomId, mode, targetTemp, fanSpeed);
-        ctx.setRunState(ServiceContext.RunState.WAITING);
+
+        // 温度预判断，决定直接进入待机还是等待
+        double currentTemp = room.getCurrentTemperature();
+        if (mode == ACMode.COOLING) {
+            // 制冷模式：当前温度 ≤ 目标温度 → 无需运行，直接待机
+            if (currentTemp <= targetTemp) {
+                ctx.setRunState(ServiceContext.RunState.STANDBY);
+                ctx.setStandbyStartTemp(currentTemp); // 记录待机起始温度
+                System.out.println("调度: 房间 " + roomId + " 开机，当前温度已满足目标，直接进入待机");
+            } else {
+                ctx.setRunState(ServiceContext.RunState.WAITING);
+            }
+        } else {
+            // 制热模式：当前温度 ≥ 目标温度 → 无需运行，直接待机
+            if (currentTemp >= targetTemp) {
+                ctx.setRunState(ServiceContext.RunState.STANDBY);
+                ctx.setStandbyStartTemp(currentTemp); // 记录待机起始温度
+                System.out.println("调度: 房间 " + roomId + " 开机，当前温度已满足目标，直接进入待机");
+            } else {
+                ctx.setRunState(ServiceContext.RunState.WAITING);
+            }
+        }
+
         allContexts.put(roomId, ctx);
-
-        System.out.println("调度: 房间 " + roomId + " 开机请求（温度="
-                + room.getCurrentTemperature() + "℃）");
-
+        System.out.println("调度: 房间 " + roomId + " 开机请求（温度=" + room.getCurrentTemperature() + "℃）");
         schedule();
+
     }
 
     // ... 其他方法保持不变 ...
@@ -74,12 +94,35 @@ public class DefaultScheduler implements Scheduler {
             ctx.setTargetTemp(targetTemp);
             System.out.println("调度: 房间 " + roomId + " 调温 -> " + targetTemp + "℃");
 
-            if (ctx.getRunState() == ServiceContext.RunState.STANDBY) {
+            if (ctx.getRunState() == ServiceContext.RunState.RUNNING) {
+                double currentTemp = room.getCurrentTemperature();
+                ACMode mode = ctx.getMode();
+                boolean isSatisfied = false;
+
+                if (mode == ACMode.COOLING) {
+                    // 制冷模式：当前温度 ≤ 新目标温度 → 满足条件
+                    isSatisfied = currentTemp <= targetTemp;
+                } else {
+                    // 制热模式：当前温度 ≥ 新目标温度 → 满足条件
+                    isSatisfied = currentTemp >= targetTemp;
+                }
+
+                if (isSatisfied) {
+                    // 立即转入待机状态，结束当前服务
+                    System.out.println("调度: 房间 " + roomId + " 调温后已满足目标，从运行转为待机");
+                    billingService.onServiceEnd(roomId, currentTimeSeconds);
+                    ctx.setRunState(ServiceContext.RunState.STANDBY);
+                    ctx.setStandbyStartTemp(currentTemp);
+                    ctx.resetCurrentRunTime();
+                    roomRepository.save(room);
+                }
+            } else if (ctx.getRunState() == ServiceContext.RunState.STANDBY) {
+                // 原逻辑：待机中调温重新进入等待
                 ctx.setRunState(ServiceContext.RunState.WAITING);
                 ctx.setStandbyStartTemp(null);
                 System.out.println("调度: 房间 " + roomId + " 待机中调温，重新请求服务");
-                schedule();
             }
+            schedule();
         }
     }
 
@@ -181,11 +224,22 @@ public class DefaultScheduler implements Scheduler {
 
                     case STANDBY:
                         processRecovery(room, snapshot.mode);
-                        if (snapshot.standbyStartTemp != null) {
-                            double diff = Math.abs(room.getCurrentTemperature()
-                                    - snapshot.standbyStartTemp);
-                            if (diff >= STANDBY_THRESHOLD) {
+                        double currentTemp = room.getCurrentTemperature();
+                        double targetTemp = snapshot.targetTemp; // 从快照获取目标温度
+
+                        if (snapshot.mode == ACMode.COOLING) {
+                            // 制冷模式：回温至 目标温度 + 阈值（25+1=26℃）时进入等待
+                            if (currentTemp >= targetTemp + STANDBY_THRESHOLD) {
                                 toWaitingList.add(roomId);
+                                System.out.println("房间 " + roomId + " 制冷待机回温超阈值（" + targetTemp + "+" + STANDBY_THRESHOLD
+                                        + "），进入等待");
+                            }
+                        } else {
+                            // 制热模式：降温至 目标温度 - 阈值时进入等待
+                            if (currentTemp <= targetTemp - STANDBY_THRESHOLD) {
+                                toWaitingList.add(roomId);
+                                System.out.println("房间 " + roomId + " 制热待机降温超阈值（" + targetTemp + "-" + STANDBY_THRESHOLD
+                                        + "），进入等待");
                             }
                         }
                         break;
