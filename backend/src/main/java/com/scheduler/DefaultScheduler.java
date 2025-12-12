@@ -44,7 +44,7 @@ public class DefaultScheduler implements Scheduler {
         room.setTargetTemp(targetTemp);
         room.setCurrentFanSpeed(fanSpeed);
 
-        // ★ 新增：每次开机增加入住天数
+        // 每次开机增加入住天数
         room.incrementCheckInDays();
         System.out.println("调度: 房间 " + roomId + " 开机，入住天数=" + room.getCheckInDays());
 
@@ -80,8 +80,6 @@ public class DefaultScheduler implements Scheduler {
         schedule();
 
     }
-
-    // ... 其他方法保持不变 ...
 
     @Override
     public void changeTemp(String roomId, double targetTemp) {
