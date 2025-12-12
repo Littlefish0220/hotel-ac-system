@@ -263,6 +263,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '../../api/index.js' 
 import { TEST_SCENARIO } from '../../api/testCases.js'
 import { TEST_SCENARIO_HEAT } from '../../api/testCasesHeat.js'
+import { BillingStore } from '../../utils/billingStore.js'
 
 const rooms = ref([])
 const isSystemOn = ref(true)
@@ -377,22 +378,44 @@ let testTimer = null
 let progressTimer = null
 const processStepsForTime = async (targetTime) => {
   console.log(`>>> Executing Actions for SimTime: ${targetTime} min`)
-
+  
+  // ★ 更新模拟时间
+  BillingStore.setSimTime(targetTime)
   const actions = currentTestScenario.value.filter(item => item.timeOffset === targetTime)
   
   for (const act of actions) {
     if (act.action === 'checkIn') {
       console.log(`[入住] 房间 ${act.roomNo}，顾客：${act.customerName}`)
-      const res = await api.checkIn(act.roomNo, act.customerName)
-      console.log('[入住API返回]', res)  // ★ 添加日志
-    } else {
+      await api.checkIn(act.roomNo, act.customerName)
+      BillingStore.initRoom(act.roomNo, act.customerName)
+    } else if (act.action === 'powerOn') {
+      BillingStore.recordEvent(act.roomNo, 'powerOn', { fanSpeed: act.fanSpeed || 'MEDIUM' }, targetTime)
       await api.controlRoom(act.roomNo, { 
-        action: act.action, 
-        targetTemp: act.targetTemp,
-        fanSpeed: act.fanSpeed
+        action: 'powerOn', 
+        targetTemp: act.targetTemp, 
+        fanSpeed: act.fanSpeed 
+      })
+    } else if (act.action === 'powerOff') {
+      BillingStore.recordEvent(act.roomNo, 'powerOff', {}, targetTime)
+      await api.controlRoom(act.roomNo, { action: 'powerOff' })
+    } else if (act.fanSpeed && !act.targetTemp) {
+      // ★ 只调速
+      BillingStore.recordEvent(act.roomNo, 'fanSpeedChange', { fanSpeed: act.fanSpeed }, targetTime)
+      await api.controlRoom(act.roomNo, { fanSpeed: act.fanSpeed })
+    } else if (act.targetTemp && !act.fanSpeed) {
+      // ★ 只调温（新增分支）
+      console.log(`[调温] 房间 ${act.roomNo} -> ${act.targetTemp}℃`)
+      await api.controlRoom(act.roomNo, { targetTemp: act.targetTemp })
+    } else if (act.targetTemp && act.fanSpeed) {
+      // ★ 同时调温调速
+      console.log(`[调整] 房间 ${act.roomNo} -> ${act.targetTemp}℃, ${act.fanSpeed}`)
+      await api.controlRoom(act.roomNo, { 
+        targetTemp: act.targetTemp, 
+        fanSpeed: act.fanSpeed 
       })
     }
   }
+
 }
 
 const maxScenarioTime = computed(() => {
@@ -412,6 +435,10 @@ const startTest = async () => {
   if (isTestRunning.value) return
   isTestRunning.value = true
   progressValue.value = 0
+
+  // ★ 重置计费系统
+  BillingStore.clearAll()
+  BillingStore.resetTime()
   
   const testMode = selectedScenario.value === 'heat' ? 'heat' : 'cool'
   await api.changeSystemMode(testMode)
