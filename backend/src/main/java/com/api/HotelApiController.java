@@ -94,10 +94,21 @@ public class HotelApiController {
         String fanSpeedStr = (String) payload.get("fanSpeed");
 
         try {
+            Room room = context.roomRepository.findById(roomNo);
+            if (room == null) {
+                return Map.of("code", 404, "msg", "房间不存在");
+            }
+
             if ("powerOn".equals(action)) {
                 context.acController.powerOn(roomNo, context.systemMode);
+                // ★ 开机时设置为占用状态
+                room.setOccupied(true);
+                context.roomRepository.save(room);
+                System.out.println("[空调] 房间 " + roomNo + " 开机，occupied=true");
             } else if ("powerOff".equals(action)) {
                 context.acController.powerOff(roomNo);
+                // ★ 关机时不改变occupied状态，保留入住信息
+                System.out.println("[空调] 房间 " + roomNo + " 关机，occupied保持不变");
             }
 
             if (tempObj != null) {
@@ -164,8 +175,19 @@ public class HotelApiController {
     public Map<String, Object> checkIn(@RequestBody Map<String, Object> payload) {
         String roomNo = (String) payload.get("roomNo");
         String customerName = (String) payload.get("customerName");
-
         try {
+            // ★ 先获取房间对象并更新状态
+            Room room = context.roomRepository.findById(roomNo);
+            if (room == null) {
+                return Map.of("code", 404, "msg", "房间不存在");
+            }
+
+            // ★ 设置入住状态（但不设置 occupied，等开机时再设置）
+            room.setCheckInDays(0);
+            room.setCurrentCustomerId(customerName); // ★ 保存顾客名称
+            context.roomRepository.save(room);
+
+            // 创建顾客和订单记录
             String customerId = "CID_" + System.currentTimeMillis();
             context.customerController.checkIn(
                     customerId,
@@ -174,6 +196,7 @@ public class HotelApiController {
                     roomNo,
                     10,
                     200.0);
+            System.out.println("[入住] 房间: " + roomNo + ", 顾客: " + customerName);
 
             return Map.of("code", 200, "msg", "入住成功");
         } catch (Exception e) {
@@ -256,11 +279,19 @@ public class HotelApiController {
             billData.put("checkInDays", days);
             billData.put("detailLogs", context.detailRepo.findByRoomId(roomNo));
 
+            // 执行退房
             context.customerController.checkOut(roomNo);
-            context.detailRepo.findByRoomId(roomNo).clear();
 
+            // ★ 不清空详单数据，用于后续打印
+            // context.detailRepo.findByRoomId(roomNo).clear();
+
+            // ★ 重置房间状态
+            room.setOccupied(false);
             room.setCheckInDays(0);
+            room.setCurrentCustomerId(null);
             context.roomRepository.save(room);
+
+            System.out.println("[退房] 房间: " + roomNo);
 
             return Map.of("code", 200, "data", billData, "msg", "退房成功");
         } catch (Exception e) {
@@ -277,6 +308,67 @@ public class HotelApiController {
         } catch (Exception e) {
             return Map.of("code", 500, "msg", "重置失败");
         }
+    }
+
+    /**
+     * ★ 新增：实时获取房间详单（运行中也能查询）
+     */
+    @GetMapping("/bill/realtime/{roomNo}")
+    public Map<String, Object> getRealtimeBill(@PathVariable String roomNo) {
+        try {
+            Room room = context.roomRepository.findById(roomNo);
+            if (room == null) {
+                return Map.of("code", 404, "msg", "房间不存在");
+            }
+
+            AcBillingServiceImpl billingService = (AcBillingServiceImpl) context.billingService;
+            int currentTimeSeconds = context.globalTimeCounter * 60;
+
+            // 获取已结算费用
+            double acFee = billingService.getRoomTotalFee(roomNo);
+            // 获取当前服务段的实时费用
+            double sessionFee = billingService.getCurrentSessionFee(roomNo, currentTimeSeconds);
+            double totalAcFee = acFee + sessionFee;
+
+            int days = room.getCheckInDays();
+            double roomFee = days * room.getPrice();
+
+            // 获取详单日志
+            List<AcDetailRecord> logs = context.detailRepo.findByRoomId(roomNo);
+
+            Map<String, Object> billData = new HashMap<>();
+            billData.put("roomNo", roomNo);
+            billData.put("customerName", getCustomerName(roomNo));
+            billData.put("acFee", totalAcFee);
+            billData.put("roomFee", roomFee);
+            billData.put("total", totalAcFee + roomFee);
+            billData.put("checkInDays", days);
+            billData.put("detailLogs", logs);
+            billData.put("checkInTime", getCheckInTime(roomNo));
+
+            return Map.of("code", 200, "data", billData);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return Map.of("code", 500, "msg", "获取账单失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * ★ 新增：获取入住时间
+     */
+    private String getCheckInTime(String roomNo) {
+        try {
+            Optional<AccommodationOrder> orderOpt = context.orderRepository.findByRoomId(roomNo);
+            if (orderOpt.isPresent()) {
+                long timestamp = orderOpt.get().getCheckInTime();
+                return LocalDateTime.ofInstant(
+                        java.time.Instant.ofEpochMilli(timestamp),
+                        java.time.ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return "";
     }
 
     @GetMapping(value = "/export/bill/{roomNo}", produces = "text/plain; charset=utf-8")
