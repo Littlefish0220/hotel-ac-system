@@ -94,7 +94,7 @@
 
           <div class="card-actions">
             <el-button 
-              v-if="room.status !== 'occupied'" 
+              v-if="!room.customerName" 
               type="primary" 
               color="#11998e" 
               size="small" 
@@ -106,6 +106,17 @@
             </el-button>
             
             <template v-else>
+              <el-button 
+                type="info" 
+                plain 
+                size="small" 
+                class="action-btn"
+                @click="openDetailView(room)"
+                :icon="Document"
+              >
+                查看详单
+              </el-button>
+              
               <el-button 
                 type="danger" 
                 plain 
@@ -125,47 +136,48 @@
     <!-- 入住弹窗 -->
     <el-dialog 
       v-model="checkInVisible" 
-      title="办理入住 Check-In" 
-      width="450px" 
+      width="420px" 
       align-center
-      class="custom-dialog"
+      class="custom-dialog checkin-dialog"
+      :show-close="false"
     >
-      <el-form :model="checkInForm" label-position="top" class="check-in-form">
-        <el-form-item label="房间号">
-          <el-input v-model="checkInForm.roomNo" disabled>
-            <template #prefix>
+      <template #header>
+        <div class="dialog-header-stylized">
+          <el-icon><UserFilled /></el-icon>
+          <span>登记入住 Check-In</span>
+        </div>
+      </template>
+
+      <div class="dialog-body-content">
+        <el-form :model="checkInForm" label-position="top" class="check-in-form">
+          <el-form-item label="房间号 / Room No.">
+            <div class="room-display-box">
               <el-icon><House /></el-icon>
-            </template>
-          </el-input>
-        </el-form-item>
-        <el-form-item label="顾客姓名" required>
-          <el-input 
-            v-model="checkInForm.name" 
-            placeholder="请输入顾客姓名"
-            clearable
-          >
-            <template #prefix>
-              <el-icon><User /></el-icon>
-            </template>
-          </el-input>
-        </el-form-item>
-        <el-alert 
-          title="入住提示" 
-          type="info" 
-          :closable="false"
-          show-icon
-        >
-          <template #default>
-            <div style="font-size: 13px;">
-              房间费用：<strong>¥{{ currentRoomRate }}/天</strong><br>
-              办理入住后将自动计费
+              <span>{{ checkInForm.roomNo }}</span>
             </div>
-          </template>
-        </el-alert>
-      </el-form>
+          </el-form-item>
+          <el-form-item label="顾客姓名 / Guest Name" required>
+            <el-input 
+              v-model="checkInForm.name" 
+              placeholder="请输入顾客姓名"
+              class="styled-input"
+              clearable
+            >
+              <template #prefix>
+                <el-icon class="input-icon"><User /></el-icon>
+              </template>
+            </el-input>
+          </el-form-item>
+          <div class="price-notice">
+            <div class="notice-label">当前房价</div>
+            <div class="notice-value">¥{{ currentRoomRate }} <small>/天</small></div>
+          </div>
+        </el-form>
+      </div>
+
       <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="checkInVisible = false">取消</el-button>
+        <div class="dialog-footer-bar">
+          <el-button @click="checkInVisible = false" plain>取消</el-button>
           <el-button 
             type="primary" 
             color="#11998e" 
@@ -174,68 +186,217 @@
           >
             确认办理
           </el-button>
-        </span>
+        </div>
       </template>
     </el-dialog>
 
-    <!-- 退房弹窗 -->
+    <!-- 退房弹窗 (与详单弹窗共用样式结构) -->
     <el-dialog 
       v-model="checkOutVisible" 
-      title="账单结算 Check-Out" 
-      width="680px" 
+      width="850px" 
       align-center
-      class="custom-dialog"
+      class="custom-dialog detail-dialog"
+      :show-close="false"
     >
-      <div class="bill-preview" v-if="currentBill">
-        <div class="bill-header">
-          <el-icon :size="40" color="#11998e"><Document /></el-icon>
-          <h3>{{ currentBill.roomNo }} 房间账单</h3>
-          <p class="customer-name">顾客：{{ currentBill.customerName }}</p>
+      <template #header>
+        <div class="dialog-header-stylized">
+          <span>账单结算 Bill Settlement</span>
+        </div>
+      </template>
+
+      <div class="detail-content" v-if="currentBill.roomNo">
+        <!-- 汇总卡片 -->
+        <div class="summary-card">
+          <div class="info-grid">
+            <div class="info-item">
+              <span class="label">房间号：</span>
+              <span class="val highlight">{{ currentBill.roomNo }}</span>
+            </div>
+            <div class="info-item">
+              <span class="label">顾客：</span>
+              <span class="val">{{ currentBill.customerName }}</span>
+            </div>
+            <div class="info-item">
+              <span class="label">打印时间：</span>
+              <span class="val">{{ new Date().toLocaleString() }}</span>
+            </div>
+            <div class="info-item">
+              <span class="label">入住天数：</span>
+              <span class="val">{{ currentBill.checkInDays }} 天</span>
+            </div>
+          </div>
+
+          <div class="cost-grid">
+            <div class="cost-item">
+              <div class="cost-label">空调费用</div>
+              <div class="cost-value">¥{{ currentBill.acFee.toFixed(2) }}</div>
+            </div>
+            <div class="cost-item">
+              <div class="cost-label">住宿费用</div>
+              <div class="cost-value">¥{{ currentBill.roomFee.toFixed(2) }}</div>
+            </div>
+            <div class="cost-item total">
+              <div class="cost-label">总计</div>
+              <div class="cost-value">¥{{ currentBill.total.toFixed(2) }}</div>
+            </div>
+          </div>
         </div>
         
-        <div class="bill-table">
-          <div class="bill-row">
-            <span class="bill-label">
-              <el-icon><Refrigerator /></el-icon>
-              空调使用费
-            </span>
-            <span class="bill-val">¥ {{ currentBill.acFee }}</span>
-          </div>
-          <div class="bill-row">
-            <span class="bill-label">
-              <el-icon><House /></el-icon>
-              住宿费 ({{ currentBill.days }}天)
-            </span>
-            <span class="bill-val">¥ {{ currentBill.roomFee }}</span>
-          </div>
-          <el-divider />
-          <div class="bill-row total-row">
-            <span class="bill-label">应付总额</span>
-            <span class="bill-val total-val">¥ {{ currentBill.total }}</span>
+        <!-- 表格区域 -->
+        <div class="table-area">
+          <el-table 
+            :data="currentBill.detailLogs" 
+            height="300"
+            style="width: 100%"
+            class="custom-table"
+            :header-cell-style="{ background: '#7ba1a1', color: '#fff', fontWeight: 'normal' }"
+          >
+            <!-- 与详单相同的列定义 -->
+            <el-table-column type="index" label="序号" width="60" align="center" />
+            <el-table-column prop="requestTimeSeconds" label="请求时间(s)" align="center" />
+            <el-table-column prop="serviceStartTimeSeconds" label="开始时间(s)" align="center" />
+            <el-table-column prop="serviceEndTimeSeconds" label="结束时间(s)" align="center" />
+            <el-table-column prop="serviceDurationSeconds" label="时长(秒)" align="center" />
+            <el-table-column prop="fanSpeed" label="风速" align="center" />
+            <el-table-column prop="currentFee" label="本段费用(元)" align="right">
+              <template #default="{ row }">¥{{ row.currentFee.toFixed(2) }}</template>
+            </el-table-column>
+            <el-table-column prop="totalFee" label="累积费用(元)" align="right">
+              <template #default="{ row }">¥{{ row.totalFee.toFixed(2) }}</template>
+            </el-table-column>
+          </el-table>
+          
+          <div v-if="!currentBill.detailLogs || currentBill.detailLogs.length === 0" class="empty-placeholder">
+            <el-icon :size="40"><Document /></el-icon>
+            <p>暂无空调使用记录</p>
           </div>
         </div>
       </div>
       
-      <!-- 底部按钮区域 -->
+      <!-- 底部栏 -->
       <template #footer>
-        <div class="dialog-footer-split">
-          <div class="left-group">
-            <span class="group-label">导出详单：</span>
+        <div class="dialog-footer-bar full-width">
+          <div class="left-actions">
+            <span class="action-label">导出格式：</span>
             <el-button-group>
-              <el-button size="small" :icon="Document" @click="exportDetail('txt')">TXT</el-button>
-              <el-button size="small" :icon="Document" @click="exportDetail('csv')">CSV</el-button>
+              <el-button size="small" @click="exportDetail('txt')">TXT</el-button>
+              <el-button size="small" @click="exportDetail('excel')">Excel</el-button>
+              <el-button size="small" @click="exportDetail('pdf')">PDF</el-button>
             </el-button-group>
           </div>
-          
-          <div class="right-group">
+          <div class="right-actions">
             <el-button @click="checkOutVisible = false">取消</el-button>
             <el-button 
               type="danger" 
               @click="submitCheckOut"
-              :icon="Printer"
+              :icon="Finished"
             >
               确认退房并清空
             </el-button>
+          </div>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- ★ 详单查看弹窗 (主要美化对象) -->
+    <el-dialog 
+      v-model="detailViewVisible" 
+      width="850px" 
+      align-center
+      class="custom-dialog detail-dialog"
+      :show-close="false"
+    >
+      <template #header>
+        <div class="dialog-header-stylized">
+          <span>空调使用详单 Detail Report</span>
+        </div>
+      </template>
+
+      <div class="detail-content">
+        <!-- 汇总卡片 (模仿参考图) -->
+        <div class="summary-card">
+          <div class="info-grid">
+            <div class="info-item">
+              <span class="label">房间号：</span>
+              <span class="val highlight">{{ currentDetail.roomNo }}</span>
+            </div>
+            <div class="info-item">
+              <span class="label">顾客：</span>
+              <span class="val">{{ currentDetail.customerName }}</span>
+            </div>
+            <div class="info-item">
+              <span class="label">入住时间：</span>
+              <span class="val">{{ currentDetail.checkInTime || '未记录' }}</span>
+            </div>
+            <div class="info-item">
+              <span class="label">入住天数：</span>
+              <span class="val">{{ currentDetail.checkInDays }} 天</span>
+            </div>
+          </div>
+
+          <div class="cost-grid">
+            <div class="cost-item">
+              <div class="cost-label">空调费用：</div>
+              <div class="cost-value">¥{{ currentDetail.acFee.toFixed(2) }}</div>
+            </div>
+            <div class="cost-item">
+              <div class="cost-label">住宿费用：</div>
+              <div class="cost-value">¥{{ currentDetail.roomFee.toFixed(2) }}</div>
+            </div>
+            <div class="cost-item total">
+              <div class="cost-label">总计：</div>
+              <div class="cost-value">¥{{ currentDetail.total.toFixed(2) }}</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 表格 -->
+        <div class="table-area">
+          <el-table 
+            :data="currentDetail.detailLogs" 
+            height="350"
+            style="width: 100%"
+            class="custom-table"
+            :header-cell-style="{ background: '#7ba1a1', color: '#fff', fontWeight: 'normal', borderRight: '1px solid rgba(255,255,255,0.2)' }"
+          >
+            <el-table-column type="index" label="序号" width="60" align="center" />
+            <el-table-column prop="requestTimeSeconds" label="请求时间(s)" align="center" />
+            <el-table-column prop="serviceStartTimeSeconds" label="开始时间(s)" align="center" />
+            <el-table-column prop="serviceEndTimeSeconds" label="结束时间(s)" align="center" />
+            <el-table-column prop="serviceDurationSeconds" label="时长(秒)" align="center" />
+            <el-table-column prop="fanSpeed" label="风速" align="center">
+              <template #default="{ row }">
+                {{ row.fanSpeed }}
+              </template>
+            </el-table-column>
+            <el-table-column prop="currentFee" label="本段费用(元)" align="center">
+              <template #default="{ row }">¥{{ row.currentFee.toFixed(2) }}</template>
+            </el-table-column>
+            <el-table-column prop="totalFee" label="累积费用(元)" align="center">
+              <template #default="{ row }">¥{{ row.totalFee.toFixed(2) }}</template>
+            </el-table-column>
+          </el-table>
+          
+          <div v-if="!currentDetail.detailLogs || currentDetail.detailLogs.length === 0" class="empty-placeholder">
+            <div class="empty-icon-box">📦</div>
+            <p>暂无空调使用记录</p>
+          </div>
+        </div>
+      </div>
+      
+      <template #footer>
+        <div class="dialog-footer-bar full-width">
+          <div class="left-actions">
+            <span class="action-label">导出格式：</span>
+            <el-button-group>
+              <el-button size="default" :icon="Document" @click="exportDetailFromView('txt')">TXT</el-button>
+              <el-button size="default" :icon="Document" @click="exportDetailFromView('excel')">Excel</el-button>
+              <el-button size="default" :icon="Printer" @click="exportDetailFromView('pdf')">PDF</el-button>
+            </el-button-group>
+          </div>
+          
+          <div class="right-actions">
+            <el-button size="default" @click="detailViewVisible = false">关闭</el-button>
           </div>
         </div>
       </template>
@@ -252,13 +413,16 @@ import {
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { api } from '../../api/index.js'
+import { exportToTXT, exportToExcel, exportToPDF } from '../../utils/exportUtils.js'
+import { BillingStore } from '../../utils/billingStore.js'
 
 const rooms = ref([])
 
 const roomsWithStatus = computed(() => {
   return rooms.value.map(room => {
-    // running 或 waiting 表示空调正在使用，房间显示为"占用"
-    const isOccupied = room.state === 'running' || room.state === 'waiting'
+    const isOccupied = room.status === 'occupied' || 
+                       room.occupied === true || 
+                       (room.customerName && room.customerName.trim() !== '')
     return {
       ...room,
       status: isOccupied ? 'occupied' : 'free'
@@ -271,20 +435,35 @@ const checkOutVisible = ref(false)
 const selectedRoom = ref(null)
 
 const checkInForm = reactive({ roomNo: '', name: '' })
+
 const currentBill = reactive({ 
   roomNo: '', 
   customerName: '',
   acFee: 0, 
   roomFee: 0,
   total: 0,
-  days: 0
+  checkInDays: 0,
+  detailLogs: []
+})
+
+// ★ 详单查看弹窗状态
+const detailViewVisible = ref(false)
+const currentDetail = reactive({
+  roomNo: '',
+  customerName: '',
+  acFee: 0,
+  roomFee: 0,
+  total: 0,
+  checkInDays: 0,
+  checkInTime: '',
+  detailLogs: []
 })
 
 const occupiedCount = computed(() => 
-  rooms.value.filter(r => r.status === 'occupied').length
+  roomsWithStatus.value.filter(r => r.status === 'occupied').length
 )
 const freeCount = computed(() => 
-  rooms.value.filter(r => r.status !== 'occupied').length
+  roomsWithStatus.value.filter(r => r.status !== 'occupied').length
 )
 const currentRoomRate = computed(() => 
   selectedRoom.value?.dailyRoomRate || 0
@@ -293,12 +472,13 @@ const currentRoomRate = computed(() =>
 const fetchRooms = async () => {
   try {
     const res = await api.getSystemStatus()
-    console.log('[前台] 获取到的数据:', res.data) // 调试日志
-    if (res && res.data && res.data.rooms) {
-      rooms.value = res.data.rooms
-      console.log('[前台] 房间列表:', rooms.value) // 调试日志
+    const data = res.data || res
+    if (data && data.rooms) {
+      rooms.value = data.rooms
     }
-  } catch (e) { console.error(e) }
+  } catch (e) { 
+    console.error('[前台] 获取数据失败:', e) 
+  }
 }
 
 const openCheckIn = (room) => {
@@ -318,76 +498,136 @@ const submitCheckIn = async () => {
     checkInVisible.value = false
     ElMessage.success(`房间 ${selectedRoom.value.roomNo} 入住成功`)
     fetchRooms()
-  } catch (e) { ElMessage.error('入住办理失败') }
+  } catch (e) { 
+    console.error('[入住] 失败:', e)
+    ElMessage.error('入住办理失败') 
+  }
+}
+
+const openDetailView = async (room) => {
+  try {
+    const res = await api.getRealtimeBill(room.roomNo)
+    if (res.code === 200 && res.data) {
+      Object.assign(currentDetail, res.data)
+      detailViewVisible.value = true
+    } else {
+      ElMessage.warning('暂无详单数据')
+    }
+  } catch (e) {
+    console.error('[详单] 获取失败:', e)
+    ElMessage.error('获取详单失败')
+  }
+}
+
+const exportDetailFromView = (format) => {
+  try {
+    if (format === 'txt') {
+      exportToTXT(currentDetail)
+      ElMessage.success('TXT账单导出成功')
+    } else if (format === 'excel') {
+      exportToExcel(currentDetail)
+      ElMessage.success('Excel详单导出成功')
+    } else if (format === 'pdf') {
+      const loading = ElMessage({
+        message: '正在生成PDF，请稍候...',
+        type: 'info',
+        duration: 0
+      })
+      
+      exportToPDF(currentDetail)
+      
+      setTimeout(() => {
+        loading.close()
+        ElMessage.success('PDF账单导出成功')
+      }, 1500)
+    }
+  } catch (e) {
+    console.error('[导出] 失败:', e)
+    ElMessage.error('导出失败')
+  }
 }
 
 const openCheckOut = async (room) => {
   selectedRoom.value = room
   try {
-    const res = await api.getBillPreview(room.roomNo)
-    if(res.code === 200 && res.data) {
-       const bill = res.data
-       currentBill.roomNo = bill.roomNo
-       currentBill.customerName = bill.customerName
-       currentBill.acFee = bill.acFee
-       currentBill.roomFee = bill.roomFee
-       currentBill.total = bill.total
-       currentBill.days = bill.days || 0
-       checkOutVisible.value = true
+    const response = await api.getBillPreview(room.roomNo)
+    const res = response.data || response 
+    
+    if (res.code === 200 && res.data) {
+      const bill = res.data
+      Object.assign(currentBill, {
+        roomNo: bill.roomNo,
+        customerName: bill.customerName || '未知',
+        acFee: parseFloat(bill.acFee) || 0,
+        roomFee: parseFloat(bill.roomFee) || 0,
+        total: parseFloat(bill.total) || 0,
+        checkInDays: bill.days || bill.checkInDays || 0,
+        detailLogs: bill.detailLogs || []
+      })
+      checkOutVisible.value = true
     } else {
-       ElMessage.error('无法获取账单详情')
+      ElMessage.error(res.msg || '无法获取账单详情')
     }
-  } catch(e) {
-    ElMessage.error('系统错误')
+  } catch (e) {
+    console.error('[退房异常]', e)
+    ElMessage.error('请求失败，请检查后端服务')
   }
 }
 
-// 修改：调用后端导出接口
-const exportDetail = async (format) => {
-  if (!selectedRoom.value) {
-    ElMessage.warning('未选择房间')
+const exportDetail = (format) => {
+  if (!currentBill.roomNo) {
+    ElMessage.warning('账单数据未就绪')
     return
   }
   
-  const roomNo = selectedRoom.value.roomNo
-  
   try {
     if (format === 'txt') {
-      // 调用文本账单导出接口
-      const res = await api.exportBill(roomNo)
-      const blob = new Blob([res.data], { type: 'text/plain;charset=utf-8' })
-      const url = window.URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `账单_${roomNo}.txt`
-      link.click()
-      window.URL.revokeObjectURL(url)
+      exportToTXT(currentBill)
       ElMessage.success('TXT账单导出成功')
-    } else if (format === 'csv') {
-      // 调用CSV详单导出接口
-      const res = await api.exportDetailCsv(roomNo)
-      const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8' })
-      const url = window.URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `详单_${roomNo}.csv`
-      link.click()
-      window.URL.revokeObjectURL(url)
-      ElMessage.success('CSV详单导出成功')
+    } else if (format === 'excel') {
+      exportToExcel(currentBill)
+      ElMessage.success('Excel详单导出成功')
+    } else if (format === 'pdf') {
+      const loading = ElMessage({
+        message: '正在生成PDF，请稍候...',
+        type: 'info',
+        duration: 0
+      })
+      
+      exportToPDF(currentBill)
+      
+      setTimeout(() => {
+        loading.close()
+        ElMessage.success('PDF账单导出成功')
+      }, 1500)
     }
   } catch (e) {
-    console.error(e)
-    ElMessage.error('导出失败')
+    console.error('[导出] 失败:', e)
+    ElMessage.error('导出失败: ' + e.message)
   }
 }
 
 const submitCheckOut = async () => {
   try {
     await api.checkOut(selectedRoom.value.roomNo)
+    BillingStore.clearRoom(selectedRoom.value.roomNo)
+
     checkOutVisible.value = false
     ElMessage.success('退房成功，房间已重置')
+    
+    currentBill.roomNo = ''
+    currentBill.customerName = ''
+    currentBill.acFee = 0
+    currentBill.roomFee = 0
+    currentBill.total = 0
+    currentBill.checkInDays = 0
+    currentBill.detailLogs = []
+    
     fetchRooms()
-  } catch (e) { ElMessage.error('退房操作失败') }
+  } catch (e) { 
+    console.error('[退房] 失败:', e)
+    ElMessage.error('退房操作失败') 
+  }
 }
 
 let timer = null
@@ -396,21 +636,65 @@ onMounted(() => {
   timer = setInterval(fetchRooms, 2000)
 })
 
-onUnmounted(() => { if (timer) clearInterval(timer) })
+onUnmounted(() => { 
+  if (timer) clearInterval(timer) 
+})
 </script>
 
 <style scoped>
-/* 保持原有样式不变 */
-.dashboard-container { padding: 30px; min-height: 100vh; background-color: #061e18; position: relative; color: #fff; font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', sans-serif; overflow-x: hidden; }
-.bg-layer-1, .bg-layer-2 { position: absolute; border-radius: 50%; filter: blur(120px); z-index: 0; pointer-events: none; }
-.bg-layer-1 { width: 60vw; height: 60vw; background: linear-gradient(135deg, #11998e, #38ef7d); opacity: 0.1; top: -20%; left: -10%; animation: float1 25s infinite alternate ease-in-out; }
-.bg-layer-2 { width: 50vw; height: 50vw; background: linear-gradient(135deg, #0f2027, #2c5364); opacity: 0.15; bottom: -20%; right: -10%; animation: float2 30s infinite alternate-reverse ease-in-out; }
+/* =========================================
+   1. Dashboard 基础背景与布局
+   ========================================= */
+.dashboard-container { 
+  padding: 30px; 
+  min-height: 100vh; 
+  background-color: #061e18; 
+  position: relative; 
+  color: #fff; 
+  font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', sans-serif; 
+  overflow-x: hidden; 
+}
+
+/* 动态背景层 */
+.bg-layer-1, .bg-layer-2 { 
+  position: absolute; 
+  border-radius: 50%; 
+  filter: blur(120px); 
+  z-index: 0; 
+  pointer-events: none; 
+}
+.bg-layer-1 { 
+  width: 60vw; height: 60vw; 
+  background: linear-gradient(135deg, #11998e, #38ef7d); 
+  opacity: 0.1; top: -20%; left: -10%; 
+  animation: float1 25s infinite alternate ease-in-out; 
+}
+.bg-layer-2 { 
+  width: 50vw; height: 50vw; 
+  background: linear-gradient(135deg, #0f2027, #2c5364); 
+  opacity: 0.15; bottom: -20%; right: -10%; 
+  animation: float2 30s infinite alternate-reverse ease-in-out; 
+}
 @keyframes float1 { 0% { transform: translate(0,0); } 100% { transform: translate(10vw, 5vh); } }
 @keyframes float2 { 0% { transform: translate(0,0); } 100% { transform: translate(-10vw, -5vh); } }
-.glass-panel { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2); color: #E5EAF3; }
+
+/* =========================================
+   2. 玻璃态卡片通用样式 (Dashboard Components)
+   ========================================= */
+.glass-panel { 
+  background: rgba(255, 255, 255, 0.05); 
+  backdrop-filter: blur(16px); 
+  border: 1px solid rgba(255, 255, 255, 0.1); 
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2); 
+  color: #E5EAF3; 
+}
+
+/* Header Section */
 .header-section { position: relative; z-index: 10; display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
 .title-box h2 { font-size: 28px; margin: 0; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
 .title-box p { margin: 5px 0 0; color: #8ebfba; font-size: 12px; letter-spacing: 2px; }
+
+/* Stats Cards */
 .stats-cards { display: flex; gap: 20px; }
 .stat-card { display: flex; align-items: center; gap: 15px; padding: 20px 25px; border-radius: 16px; transition: all 0.3s ease; }
 .stat-card:hover { transform: translateY(-5px); box-shadow: 0 8px 40px rgba(0, 0, 0, 0.3); }
@@ -421,13 +705,19 @@ onUnmounted(() => { if (timer) clearInterval(timer) })
 .free-card .stat-icon { background: rgba(103, 194, 58, 0.2); color: #67C23A; }
 .stat-content { display: flex; flex-direction: column; }
 .stat-value { font-size: 32px; font-weight: bold; line-height: 1; margin-bottom: 5px; }
-.occupied-card .stat-value { color: #F56C6C; } .free-card .stat-value { color: #67C23A; }
+.occupied-card .stat-value { color: #F56C6C; } 
+.free-card .stat-value { color: #67C23A; }
 .stat-label { font-size: 13px; color: #a6b0c2; }
+
+/* Room List Grid */
 .room-list { position: relative; z-index: 10; }
 .room-card { border-radius: 16px; margin-bottom: 24px; border: none; transition: all 0.3s ease; }
 .room-card:hover { transform: translateY(-5px); box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4); }
-.room-card.occupied { border-left: 4px solid #F56C6C; } .room-card.free { border-left: 4px solid #11998e; }
+.room-card.occupied { border-left: 4px solid #F56C6C; } 
+.room-card.free { border-left: 4px solid #11998e; }
 :deep(.room-card .el-card__body) { padding: 20px; }
+
+/* Card Internals */
 .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
 .room-no { font-size: 24px; font-weight: bold; color: #11998e; text-shadow: 0 2px 10px rgba(17, 153, 142, 0.3); }
 .status-tag { display: flex; align-items: center; gap: 5px; padding: 5px 12px; }
@@ -441,54 +731,274 @@ onUnmounted(() => { if (timer) clearInterval(timer) })
 .action-btn { flex: 1; border-radius: 8px; transition: all 0.3s ease; }
 .action-btn:hover { transform: scale(1.05); }
 
-:deep(.custom-dialog .el-dialog) { background: rgba(15, 32, 39, 0.95); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5); }
-:deep(.custom-dialog .el-dialog__header) { background: rgba(0, 0, 0, 0.2); border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding: 20px; }
-:deep(.custom-dialog .el-dialog__title) { color: #fff; font-weight: 500; font-size: 18px; }
-:deep(.custom-dialog .el-dialog__body) { background: transparent; color: #fff; padding: 25px; }
-:deep(.custom-dialog .el-dialog__footer) { background: rgba(0, 0, 0, 0.2); border-top: 1px solid rgba(255, 255, 255, 0.05); padding: 15px 20px; }
-.check-in-form { padding: 10px 0; }
-:deep(.check-in-form .el-form-item__label) { color: #a6b0c2; font-weight: 500; }
-:deep(.check-in-form .el-input__wrapper) { background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: none; }
-:deep(.check-in-form .el-input__inner) { color: #fff; }
-:deep(.check-in-form .el-alert) { background: rgba(64, 158, 255, 0.1); border: 1px solid rgba(64, 158, 255, 0.2); margin-top: 15px; }
-.bill-preview { padding: 10px 0; }
-.bill-header { text-align: center; margin-bottom: 25px; padding-bottom: 20px; border-bottom: 2px solid rgba(255, 255, 255, 0.1); }
-.bill-header h3 { margin: 15px 0 10px; font-size: 22px; color: #11998e; }
-.customer-name { color: #a6b0c2; font-size: 14px; margin: 5px 0 0; }
-.bill-table { background: rgba(0, 0, 0, 0.2); padding: 20px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.05); }
-.bill-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; font-size: 15px; }
-.bill-label { display: flex; align-items: center; gap: 8px; color: #a6b0c2; }
-.bill-val { font-weight: 500; color: #fff; font-family: monospace; font-size: 16px; }
-:deep(.bill-table .el-divider) { margin: 20px 0; background-color: rgba(255, 255, 255, 0.1); }
-.total-row { margin-bottom: 0; padding-top: 15px; }
-.total-row .bill-label { font-size: 17px; font-weight: bold; color: #fff; }
-.total-val { font-size: 24px !important; font-weight: bold; color: #E6A23C !important; }
+/* =========================================
+   3. 弹窗通用样式 (Element Plus Override)
+   ========================================= */
+:deep(.custom-dialog.el-dialog) { 
+  background: rgba(19, 36, 40, 0.95); /* 深色磨砂背景 */
+  backdrop-filter: blur(25px); 
+  border: 1px solid rgba(255, 255, 255, 0.15); 
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6); 
+  border-radius: 16px;
+  overflow: hidden;
+}
+:deep(.custom-dialog .el-dialog__header) { 
+  margin: 0; padding: 0; 
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+:deep(.custom-dialog .el-dialog__body) { 
+  background: transparent; 
+  color: #fff; 
+  padding: 0; /* 移除默认内边距，由内容控制 */
+}
+:deep(.custom-dialog .el-dialog__footer) { 
+  padding: 0; 
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.2);
+}
 
-.dialog-footer-split {
+/* 弹窗自定义 Header */
+.dialog-header-stylized {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 24px;
+  font-size: 18px;
+  font-weight: 500;
+  color: #fff;
+  letter-spacing: 0.5px;
+}
+
+/* 底部操作栏 */
+.dialog-footer-bar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 15px 24px;
+  gap: 12px;
+}
+.dialog-footer-bar.full-width {
+  justify-content: space-between;
+  align-items: center;
+}
+.left-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.action-label {
+  font-size: 13px;
+  color: #a6b0c2;
+}
+
+/* =========================================
+   4. 入住登记弹窗样式
+   ========================================= */
+.checkin-dialog .dialog-body-content {
+  padding: 30px 40px;
+}
+.check-in-form :deep(.el-form-item__label) { 
+  color: #a6b0c2; 
+  font-weight: 500; 
+  padding-bottom: 8px;
+}
+.room-display-box {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(17, 153, 142, 0.15);
+  border: 1px solid rgba(17, 153, 142, 0.3);
+  padding: 10px 15px;
+  border-radius: 8px;
+  color: #11998e;
+  font-weight: bold;
+  font-size: 16px;
+}
+:deep(.styled-input .el-input__wrapper) { 
+  background: rgba(255, 255, 255, 0.05); 
+  border: 1px solid rgba(255, 255, 255, 0.1); 
+  box-shadow: none; 
+  padding: 8px 12px;
+}
+:deep(.styled-input .el-input__wrapper:hover),
+:deep(.styled-input .el-input__wrapper.is-focus) {
+  border-color: #11998e;
+  background: rgba(255, 255, 255, 0.08);
+}
+:deep(.styled-input .el-input__inner) { 
+  color: #fff; 
+  font-size: 15px;
+}
+.price-notice {
+  margin-top: 25px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  padding: 15px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  width: 100%;
+  border: 1px dashed rgba(255,255,255,0.15);
 }
-.left-group {
+.notice-label { font-size: 13px; color: #a6b0c2; }
+.notice-value { font-size: 18px; color: #E6A23C; font-weight: bold; font-family: monospace; }
+.notice-value small { font-size: 12px; color: #888; font-weight: normal; }
+
+/* =========================================
+   5. 详单/账单弹窗样式 (重点美化)
+   ========================================= */
+.detail-dialog .detail-content {
+  padding: 24px;
+}
+
+/* 汇总信息卡片 - 仿照参考图的灰色/半透明块 */
+.summary-card {
+  background: rgba(255, 255, 255, 0.08); /* 浅色半透明背景 */
+  border-radius: 12px;
+  padding: 25px 30px;
+  margin-bottom: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 15px 40px;
+  margin-bottom: 30px;
+}
+
+.info-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  font-size: 14px;
 }
-.group-label {
-  font-size: 12px;
-  color: #a6b0c2;
+.info-item .label {
+  color: #a6b0c2; /* 浅灰色标签 */
+  width: 80px;
 }
-.right-group {
-  display: flex;
-  gap: 10px;
+.info-item .val {
+  color: #fff;
+  font-weight: 600;
 }
-:deep(.el-button) { border-radius: 8px; padding: 10px 20px; transition: all 0.3s ease; }
-:deep(.el-button:hover) { transform: translateY(-2px); }
+.info-item .val.highlight {
+  font-size: 16px;
+}
 
+/* 费用展示区 - 居中、大字体、高亮 */
+.cost-grid {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 25px;
+}
+
+.cost-item {
+  text-align: center;
+}
+
+.cost-label {
+  font-size: 13px;
+  color: #a6b0c2; /* 类似参考图的蓝色/灰色 */
+  margin-bottom: 8px;
+}
+
+.cost-value {
+  font-size: 20px;
+  font-weight: bold;
+  color: #e6a23c; /* 参考图的金黄色 */
+  font-family: 'Georgia', serif; /* 稍微衬线一点的字体更有质感 */
+  letter-spacing: 0.5px;
+}
+
+.cost-item.total .cost-value {
+  font-size: 26px;
+  color: #e6a23c;
+}
+
+/* 表格区域 */
+.table-area {
+  background: transparent;
+  border-radius: 8px;
+  overflow: hidden; /* 保证圆角 */
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* 自定义表格样式 */
+:deep(.custom-table) {
+  --el-table-border-color: rgba(255, 255, 255, 0.1);
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-header-bg-color: #7ba1a1; /* 参考图的青绿色表头 */
+  background: transparent !important;
+  color: #fff;
+}
+
+:deep(.custom-table th.el-table__cell) {
+  background-color: #7ba1a1 !important; /* 强制表头颜色 */
+  color: #fff !important;
+  font-weight: 500;
+  border-bottom: none;
+  height: 45px;
+}
+
+:deep(.custom-table tr) {
+  background-color: rgba(255, 255, 255, 0.02); /* 默认行背景 */
+}
+
+:deep(.custom-table .el-table__row--striped td.el-table__cell) {
+  background-color: rgba(255, 255, 255, 0.06); /* 斑马纹颜色 */
+}
+
+:deep(.custom-table td.el-table__cell) {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+:deep(.custom-table .cell) {
+  padding: 0 8px;
+  font-size: 13px;
+}
+
+/* 空状态占位 */
+.empty-placeholder {
+  height: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #a6b0c2;
+  background: rgba(0,0,0,0.1);
+}
+.empty-icon-box {
+  font-size: 48px;
+  opacity: 0.5;
+  margin-bottom: 10px;
+}
+
+/* 按钮样式微调 */
+:deep(.el-button) { 
+  border-radius: 6px; 
+  font-weight: 500;
+}
+:deep(.el-button-group .el-button) {
+  border-radius: 0;
+  border-color: rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.05);
+  color: #fff;
+}
+:deep(.el-button-group .el-button:first-child) { border-top-left-radius: 6px; border-bottom-left-radius: 6px; }
+:deep(.el-button-group .el-button:last-child) { border-top-right-radius: 6px; border-bottom-right-radius: 6px; }
+:deep(.el-button-group .el-button:hover) {
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+}
+
+/* 响应式适配 */
 @media (max-width: 768px) {
   .header-section { flex-direction: column; align-items: flex-start; gap: 20px; }
-  .dialog-footer-split { flex-direction: column; gap: 15px; align-items: flex-end; }
-  .left-group { width: 100%; justify-content: space-between; }
+  .dialog-footer-bar.full-width { flex-direction: column; gap: 15px; align-items: stretch; }
+  .left-actions { justify-content: space-between; }
+  .info-grid { grid-template-columns: 1fr; gap: 10px; }
+  .cost-grid { flex-direction: column; gap: 15px; align-items: flex-start; }
 }
 </style>
