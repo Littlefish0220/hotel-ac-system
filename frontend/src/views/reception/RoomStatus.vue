@@ -3,6 +3,7 @@
     <div class="bg-layer-1"></div>
     <div class="bg-layer-2"></div>
 
+    <!-- 顶部工作台 -->
     <div class="header-section">
       <div class="title-box">
         <h2>前台工作台</h2>
@@ -31,6 +32,7 @@
       </div>
     </div>
 
+    <!-- 房间列表 -->
     <el-row :gutter="20" class="room-list">
       <el-col 
         v-for="room in roomsWithStatus" 
@@ -93,6 +95,7 @@
           </div>
 
           <div class="card-actions">
+            <!-- 入住登记按钮 -->
             <el-button 
               v-if="!room.customerName" 
               type="primary" 
@@ -105,6 +108,7 @@
               办理入住
             </el-button>
             
+            <!-- 已入住房间的操作 -->
             <template v-else>
               <el-button 
                 type="info" 
@@ -190,13 +194,14 @@
       </template>
     </el-dialog>
 
-    <!-- 退房弹窗 (与详单弹窗共用样式结构) -->
+    <!-- 退房弹窗 (集成饼图) -->
     <el-dialog 
       v-model="checkOutVisible" 
       width="850px" 
       align-center
       class="custom-dialog detail-dialog"
       :show-close="false"
+      @opened="initPieChart"
     >
       <template #header>
         <div class="dialog-header-stylized">
@@ -205,40 +210,48 @@
       </template>
 
       <div class="detail-content" v-if="currentBill.roomNo">
-        <!-- 汇总卡片 -->
-        <div class="summary-card">
-          <div class="info-grid">
-            <div class="info-item">
-              <span class="label">房间号：</span>
-              <span class="val highlight">{{ currentBill.roomNo }}</span>
+        <!-- 汇总区域：左侧信息 + 右侧饼图 -->
+        <div class="summary-section-wrapper">
+          <!-- 左侧：文字信息 -->
+          <div class="summary-card left-card">
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="label">房间号：</span>
+                <span class="val highlight">{{ currentBill.roomNo }}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">顾客：</span>
+                <span class="val">{{ currentBill.customerName }}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">打印时间：</span>
+                <span class="val">{{ new Date().toLocaleString() }}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">入住天数：</span>
+                <span class="val">{{ currentBill.checkInDays }} 天</span>
+              </div>
             </div>
-            <div class="info-item">
-              <span class="label">顾客：</span>
-              <span class="val">{{ currentBill.customerName }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">打印时间：</span>
-              <span class="val">{{ new Date().toLocaleString() }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">入住天数：</span>
-              <span class="val">{{ currentBill.checkInDays }} 天</span>
+
+            <div class="cost-grid">
+              <div class="cost-item">
+                <div class="cost-label">空调费用</div>
+                <div class="cost-value">¥{{ currentBill.acFee.toFixed(2) }}</div>
+              </div>
+              <div class="cost-item">
+                <div class="cost-label">住宿费用</div>
+                <div class="cost-value">¥{{ currentBill.roomFee.toFixed(2) }}</div>
+              </div>
+              <div class="cost-item total">
+                <div class="cost-label">总计</div>
+                <div class="cost-value">¥{{ currentBill.total.toFixed(2) }}</div>
+              </div>
             </div>
           </div>
 
-          <div class="cost-grid">
-            <div class="cost-item">
-              <div class="cost-label">空调费用</div>
-              <div class="cost-value">¥{{ currentBill.acFee.toFixed(2) }}</div>
-            </div>
-            <div class="cost-item">
-              <div class="cost-label">住宿费用</div>
-              <div class="cost-value">¥{{ currentBill.roomFee.toFixed(2) }}</div>
-            </div>
-            <div class="cost-item total">
-              <div class="cost-label">总计</div>
-              <div class="cost-value">¥{{ currentBill.total.toFixed(2) }}</div>
-            </div>
+          <!-- 右侧：饼图容器 -->
+          <div class="pie-chart-card">
+            <div id="billPieChart" style="width: 100%; height: 100%;"></div>
           </div>
         </div>
         
@@ -251,7 +264,6 @@
             class="custom-table"
             :header-cell-style="{ background: '#7ba1a1', color: '#fff', fontWeight: 'normal' }"
           >
-            <!-- 与详单相同的列定义 -->
             <el-table-column type="index" label="序号" width="60" align="center" />
             <el-table-column prop="requestTimeSeconds" label="请求时间(s)" align="center" />
             <el-table-column prop="serviceStartTimeSeconds" label="开始时间(s)" align="center" />
@@ -298,7 +310,7 @@
       </template>
     </el-dialog>
 
-    <!-- ★ 详单查看弹窗 (主要美化对象) -->
+    <!-- 详单查看弹窗 -->
     <el-dialog 
       v-model="detailViewVisible" 
       width="850px" 
@@ -313,7 +325,7 @@
       </template>
 
       <div class="detail-content">
-        <!-- 汇总卡片 (模仿参考图) -->
+        <!-- 汇总卡片 -->
         <div class="summary-card">
           <div class="info-grid">
             <div class="info-item">
@@ -415,6 +427,7 @@ import { ElMessage } from 'element-plus'
 import { api } from '../../api/index.js'
 import { exportToTXT, exportToExcel, exportToPDF } from '../../utils/exportUtils.js'
 import { BillingStore } from '../../utils/billingStore.js'
+import * as echarts from 'echarts'
 
 const rooms = ref([])
 
@@ -446,7 +459,6 @@ const currentBill = reactive({
   detailLogs: []
 })
 
-// ★ 详单查看弹窗状态
 const detailViewVisible = ref(false)
 const currentDetail = reactive({
   roomNo: '',
@@ -458,6 +470,8 @@ const currentDetail = reactive({
   checkInTime: '',
   detailLogs: []
 })
+
+let pieChartInstance = null
 
 const occupiedCount = computed(() => 
   roomsWithStatus.value.filter(r => r.status === 'occupied').length
@@ -574,6 +588,63 @@ const openCheckOut = async (room) => {
   }
 }
 
+const initPieChart = () => {
+  const chartDom = document.getElementById('billPieChart')
+  if (!chartDom) return
+  
+  if (pieChartInstance) {
+    pieChartInstance.dispose()
+  }
+  pieChartInstance = echarts.init(chartDom)
+  
+  const option = {
+    tooltip: {
+      trigger: 'item',
+      formatter: '{b}: ¥{c} ({d}%)'
+    },
+    legend: {
+      bottom: '5%',
+      left: 'center',
+      textStyle: { color: '#ccc' }
+    },
+    series: [
+      {
+        name: '费用构成',
+        type: 'pie',
+        radius: ['40%', '70%'],
+        center: ['50%', '45%'],
+        avoidLabelOverlap: false,
+        itemStyle: {
+          borderRadius: 5,
+          borderColor: '#1f2d3d', 
+          borderWidth: 2
+        },
+        label: {
+          show: false,
+          position: 'center'
+        },
+        emphasis: {
+          label: {
+            show: true,
+            fontSize: '16',
+            fontWeight: 'bold',
+            color: '#fff'
+          }
+        },
+        labelLine: {
+          show: false
+        },
+        data: [
+          { value: currentBill.acFee, name: '空调费', itemStyle: { color: '#e6a23c' } },
+          { value: currentBill.roomFee, name: '住宿费', itemStyle: { color: '#11998e' } }
+        ]
+      }
+    ]
+  }
+  
+  pieChartInstance.setOption(option)
+}
+
 const exportDetail = (format) => {
   if (!currentBill.roomNo) {
     ElMessage.warning('账单数据未就绪')
@@ -638,6 +709,7 @@ onMounted(() => {
 
 onUnmounted(() => { 
   if (timer) clearInterval(timer) 
+  if (pieChartInstance) pieChartInstance.dispose()
 })
 </script>
 
@@ -845,19 +917,39 @@ onUnmounted(() => {
 .notice-value small { font-size: 12px; color: #888; font-weight: normal; }
 
 /* =========================================
-   5. 详单/账单弹窗样式 (重点美化)
+   5. 详单/账单弹窗样式
    ========================================= */
 .detail-dialog .detail-content {
   padding: 24px;
 }
 
-/* 汇总信息卡片 - 仿照参考图的灰色/半透明块 */
+/* 汇总信息卡片 */
 .summary-card {
-  background: rgba(255, 255, 255, 0.08); /* 浅色半透明背景 */
+  background: rgba(255, 255, 255, 0.08);
   border-radius: 12px;
   padding: 25px 30px;
   margin-bottom: 20px;
   border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.summary-section-wrapper {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.summary-card.left-card {
+  flex: 2;
+  margin-bottom: 0;
+}
+
+.pie-chart-card {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 10px;
+  min-width: 250px;
 }
 
 .info-grid {
@@ -873,7 +965,7 @@ onUnmounted(() => {
   font-size: 14px;
 }
 .info-item .label {
-  color: #a6b0c2; /* 浅灰色标签 */
+  color: #a6b0c2;
   width: 80px;
 }
 .info-item .val {
@@ -884,7 +976,7 @@ onUnmounted(() => {
   font-size: 16px;
 }
 
-/* 费用展示区 - 居中、大字体、高亮 */
+/* 费用展示区 */
 .cost-grid {
   display: flex;
   justify-content: space-around;
@@ -899,15 +991,15 @@ onUnmounted(() => {
 
 .cost-label {
   font-size: 13px;
-  color: #a6b0c2; /* 类似参考图的蓝色/灰色 */
+  color: #a6b0c2;
   margin-bottom: 8px;
 }
 
 .cost-value {
   font-size: 20px;
   font-weight: bold;
-  color: #e6a23c; /* 参考图的金黄色 */
-  font-family: 'Georgia', serif; /* 稍微衬线一点的字体更有质感 */
+  color: #e6a23c;
+  font-family: 'Georgia', serif;
   letter-spacing: 0.5px;
 }
 
@@ -920,7 +1012,7 @@ onUnmounted(() => {
 .table-area {
   background: transparent;
   border-radius: 8px;
-  overflow: hidden; /* 保证圆角 */
+  overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
@@ -929,13 +1021,13 @@ onUnmounted(() => {
   --el-table-border-color: rgba(255, 255, 255, 0.1);
   --el-table-bg-color: transparent;
   --el-table-tr-bg-color: transparent;
-  --el-table-header-bg-color: #7ba1a1; /* 参考图的青绿色表头 */
+  --el-table-header-bg-color: #7ba1a1;
   background: transparent !important;
   color: #fff;
 }
 
 :deep(.custom-table th.el-table__cell) {
-  background-color: #7ba1a1 !important; /* 强制表头颜色 */
+  background-color: #7ba1a1 !important;
   color: #fff !important;
   font-weight: 500;
   border-bottom: none;
@@ -943,11 +1035,11 @@ onUnmounted(() => {
 }
 
 :deep(.custom-table tr) {
-  background-color: rgba(255, 255, 255, 0.02); /* 默认行背景 */
+  background-color: rgba(255, 255, 255, 0.02);
 }
 
 :deep(.custom-table .el-table__row--striped td.el-table__cell) {
-  background-color: rgba(255, 255, 255, 0.06); /* 斑马纹颜色 */
+  background-color: rgba(255, 255, 255, 0.06);
 }
 
 :deep(.custom-table td.el-table__cell) {
@@ -1000,5 +1092,6 @@ onUnmounted(() => {
   .left-actions { justify-content: space-between; }
   .info-grid { grid-template-columns: 1fr; gap: 10px; }
   .cost-grid { flex-direction: column; gap: 15px; align-items: flex-start; }
+  .summary-section-wrapper { flex-direction: column; }
 }
 </style>
