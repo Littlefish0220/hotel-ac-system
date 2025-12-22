@@ -6,18 +6,18 @@ class BillingStoreClass {
   constructor() {
     // 存储结构：{ roomNo: { logs: [], checkInTime: timestamp, ... } }
     this.roomData = {}
-    this.simTime = 0  // ★ 新增
+    this.simTime = 0
 
   }
-  // ★ 新增：设置模拟时间
+  // 设置模拟时间
   setSimTime(minutes) {
     this.simTime = minutes
   }
-  // ★ 新增：重置时间
+  // 重置时间
   resetTime() {
     this.simTime = 0
   }
-  // ★ 新增：记录事件
+  // 记录事件
   recordEvent(roomNo, eventType, params = {}, timeMinute) {
     if (!this.roomData[roomNo]) {
       this.initRoom(roomNo, '')
@@ -50,7 +50,8 @@ class BillingStoreClass {
         customerName,
         checkInTime: Date.now(),
         logs: [],
-        totalAcFee: 0
+        totalAcFee: 0,
+        deposit: 0
       }
     }
   }
@@ -98,13 +99,18 @@ class BillingStoreClass {
     const logs = this.getRoomLogs(roomNo)
     const acFee = roomInfo.fee || 0
     const roomFee = (roomInfo.checkInDays || 0) * (roomInfo.dailyRoomRate || 0)
-    
+    const total = acFee + roomFee
+
+    const deposit = this.roomData[roomNo]?.deposit || 0
+    const refund = deposit - total
     return {
       roomNo,
       customerName: roomInfo.customerName || '',
       acFee,
       roomFee,
-      total: acFee + roomFee,
+      total,
+      deposit,
+      refund,
       checkInDays: roomInfo.checkInDays || 0,
       detailLogs: logs
     }
@@ -123,6 +129,33 @@ class BillingStoreClass {
   clearAll() {
     this.roomData = {}
   }
+
+  /**
+   * 设置押金
+   */
+  setDeposit(roomNo, amount) {
+    if (!this.roomData[roomNo]) {
+      this.initRoom(roomNo, '')
+    }
+    this.roomData[roomNo].deposit = amount
+  }
+
+  /** 
+   * 获取押金
+   */
+  getDeposit(roomNo) {
+    return this.roomData[roomNo]?.deposit || 0
+  }
+
+  /**
+   * 清空押金
+   */
+  clearDeposit(roomNo) {
+    if (this.roomData[roomNo]) {
+      this.roomData[roomNo].deposit = 0
+    }
+  }
+
 }
 
 export const BillingStore = new BillingStoreClass()

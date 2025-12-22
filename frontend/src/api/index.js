@@ -39,9 +39,9 @@ export const api = {
     return response;
   },
 
-  checkIn: async (roomNo, customerName) => {
+  checkIn: async (roomNo, customerName, deposit) => {
     if (USE_MOCK) return MockApi.checkIn(roomNo, customerName);
-    const response = await axios.post('/checkIn', { roomNo, customerName });
+    const response = await axios.post('/checkIn', { roomNo, customerName, deposit });
     return response;
   },
 
@@ -71,7 +71,7 @@ export const api = {
     return axios.get(`/export/detail/${roomNo}`, { responseType: 'blob' });
   },
 
-  // ★ 修正后的 getRealtimeBill
+  // 修正后的 getRealtimeBill
   getRealtimeBill: async (roomNo) => {
     if (USE_MOCK) {
       return { code: 200, data: {} };

@@ -101,13 +101,13 @@ public class HotelApiController {
 
             if ("powerOn".equals(action)) {
                 context.acController.powerOn(roomNo, context.systemMode);
-                // ★ 开机时设置为占用状态
+                // 开机时设置为占用状态
                 room.setOccupied(true);
                 context.roomRepository.save(room);
                 System.out.println("[空调] 房间 " + roomNo + " 开机，occupied=true");
             } else if ("powerOff".equals(action)) {
                 context.acController.powerOff(roomNo);
-                // ★ 关机时不改变occupied状态，保留入住信息
+                // 关机时不改变occupied状态，保留入住信息
                 System.out.println("[空调] 房间 " + roomNo + " 关机，occupied保持不变");
             }
 
@@ -175,28 +175,58 @@ public class HotelApiController {
     public Map<String, Object> checkIn(@RequestBody Map<String, Object> payload) {
         String roomNo = (String) payload.get("roomNo");
         String customerName = (String) payload.get("customerName");
+        Object depositObj = payload.get("deposit");
+        double deposit = 0.0;
+        if (depositObj != null) {
+            try {
+                if (depositObj instanceof Number) {
+                    deposit = ((Number) depositObj).doubleValue();
+                } else {
+                    deposit = Double.parseDouble(depositObj.toString());
+                }
+            } catch (Exception ex) {
+                return Map.of("code", 400, "msg", "押金格式错误");
+            }
+        }
+
+        // 可选的入住天数字段，默认 1 天
+        int days = 1;
+        //Object daysObj = payload.get("days");
+        // if (daysObj != null) {
+        //     try {
+        //         if (daysObj instanceof Number) {
+        //             days = ((Number) daysObj).intValue();
+        //         } else {
+        //             days = Integer.parseInt(daysObj.toString());
+        //         }
+        //     } catch (Exception ex) {
+        //         // 忽略错误，使用默认 days
+        //         days = 1;
+        //     }
+        // }
+
         try {
-            // ★ 先获取房间对象并更新状态
+            // 先获取房间对象并更新状态
             Room room = context.roomRepository.findById(roomNo);
             if (room == null) {
                 return Map.of("code", 404, "msg", "房间不存在");
             }
 
-            // ★ 设置入住状态（但不设置 occupied，等开机时再设置）
+            // 设置入住状态（但不设置 occupied，等开机时再设置）
             room.setCheckInDays(0);
-            room.setCurrentCustomerId(customerName); // ★ 保存顾客名称
+            room.setCurrentCustomerId(customerName); // 保存顾客名称
             context.roomRepository.save(room);
 
-            // 创建顾客和订单记录
+            // 创建顾客和订单记录，使用传入的押金和天数
             String customerId = "CID_" + System.currentTimeMillis();
             context.customerController.checkIn(
                     customerId,
                     customerName,
                     "ID_" + System.currentTimeMillis(),
                     roomNo,
-                    10,
-                    200.0);
-            System.out.println("[入住] 房间: " + roomNo + ", 顾客: " + customerName);
+                    days,
+                    deposit);
+            System.out.println("[入住] 房间: " + roomNo + ", 顾客: " + customerName + ", 押金: " + deposit);
 
             return Map.of("code", 200, "msg", "入住成功");
         } catch (Exception e) {
@@ -224,11 +254,17 @@ public class HotelApiController {
             double roomFee = days * room.getPrice();
             double total = totalAcFee + roomFee;
 
+            Optional<AccommodationOrder> orderOpt = context.orderRepository.findByRoomId(roomNo);
+            double deposit = orderOpt.isPresent() ? orderOpt.get().getDeposit() : 0.0;
+            double refund = deposit - total;
+
             Map<String, Object> bill = new HashMap<>();
             bill.put("roomNo", roomNo);
             bill.put("customerName", getCustomerName(roomNo));
             bill.put("acFee", String.format("%.2f", totalAcFee));
             bill.put("roomFee", String.format("%.2f", roomFee));
+            bill.put("deposit", String.format("%.2f", deposit));
+            bill.put("refund", String.format("%.2f", refund));
             bill.put("total", String.format("%.2f", total));
             bill.put("days", days);
             bill.put("detailLogs", context.detailRepo.findByRoomId(roomNo));
@@ -282,10 +318,10 @@ public class HotelApiController {
             // 执行退房
             context.customerController.checkOut(roomNo);
 
-            // ★ 不清空详单数据，用于后续打印
+            // 不清空详单数据，用于后续打印
             // context.detailRepo.findByRoomId(roomNo).clear();
 
-            // ★ 重置房间状态
+            // 重置房间状态
             room.setOccupied(false);
             room.setCheckInDays(0);
             room.setCurrentCustomerId(null);
@@ -311,7 +347,90 @@ public class HotelApiController {
     }
 
     /**
-     * ★ 新增：实时获取房间详单（运行中也能查询）
+     * ★ 新增：获取房间押金信息
+     */
+    @GetMapping("/room/deposit/{roomNo}")
+    public Map<String, Object> getRoomDeposit(@PathVariable String roomNo) {
+        try {
+            Room room = context.roomRepository.findById(roomNo);
+            if (room == null) {
+                return Map.of("code", 404, "msg", "房间不存在");
+            }
+
+            Optional<AccommodationOrder> orderOpt = context.orderRepository.findByRoomId(roomNo);
+            if (!orderOpt.isPresent()) {
+                return Map.of("code", 404, "msg", "房间未入住或订单不存在");
+            }
+
+            AccommodationOrder order = orderOpt.get();
+            double deposit = order.getDeposit();
+
+            Map<String, Object> data = new HashMap<>();
+            data.put("roomNo", roomNo);
+            data.put("customerName", getCustomerName(roomNo));
+            data.put("deposit", String.format("%.2f", deposit));
+            data.put("checkInTime", getCheckInTime(roomNo));
+
+            return Map.of("code", 200, "data", data);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return Map.of("code", 500, "msg", "获取押金失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * ★ 新增：获取房间结算信息（包含押金、应收、退款）
+     */
+    @GetMapping("/room/settlement/{roomNo}")
+    public Map<String, Object> getRoomSettlement(@PathVariable String roomNo) {
+        try {
+            Room room = context.roomRepository.findById(roomNo);
+            if (room == null) {
+                return Map.of("code", 404, "msg", "房间不存在");
+            }
+
+            Optional<AccommodationOrder> orderOpt = context.orderRepository.findByRoomId(roomNo);
+            if (!orderOpt.isPresent()) {
+                return Map.of("code", 404, "msg", "房间未入住或订单不存在");
+            }
+
+            AcBillingServiceImpl billingService = (AcBillingServiceImpl) context.billingService;
+            int currentTimeSeconds = context.globalTimeCounter * 60;
+
+            // 费用计算
+            double acFee = billingService.getRoomTotalFee(roomNo);
+            double sessionFee = billingService.getCurrentSessionFee(roomNo, currentTimeSeconds);
+            double totalAcFee = acFee + sessionFee;
+
+            int days = room.getCheckInDays();
+            double roomFee = days * room.getPrice();
+            double totalAmount = totalAcFee + roomFee;
+
+            // 押金信息
+            AccommodationOrder order = orderOpt.get();
+            double deposit = order.getDeposit();
+            double refund = deposit - totalAmount;
+
+            Map<String, Object> settlement = new HashMap<>();
+            settlement.put("roomNo", roomNo);
+            settlement.put("customerName", getCustomerName(roomNo));
+            settlement.put("acFee", String.format("%.2f", totalAcFee));
+            settlement.put("roomFee", String.format("%.2f", roomFee));
+            settlement.put("totalAmount", String.format("%.2f", totalAmount));
+            settlement.put("deposit", String.format("%.2f", deposit));
+            settlement.put("refund", String.format("%.2f", refund));
+            settlement.put("checkInDays", days);
+            settlement.put("checkInTime", getCheckInTime(roomNo));
+
+            return Map.of("code", 200, "data", settlement);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return Map.of("code", 500, "msg", "获取结算信息失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 新增：实时获取房间详单（运行中也能查询）
      */
     @GetMapping("/bill/realtime/{roomNo}")
     public Map<String, Object> getRealtimeBill(@PathVariable String roomNo) {
@@ -354,7 +473,7 @@ public class HotelApiController {
     }
 
     /**
-     * ★ 新增：获取入住时间
+     * 新增：获取入住时间
      */
     private String getCheckInTime(String roomNo) {
         try {

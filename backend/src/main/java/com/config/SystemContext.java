@@ -65,7 +65,7 @@ public class SystemContext {
     }
 
     /**
-     * ★ 新增：切换模式并重新初始化房间
+     * 新增：切换模式并重新初始化房间
      */
     public synchronized void switchModeAndReset(ACMode newMode) {
         this.systemMode = newMode;
@@ -104,7 +104,7 @@ public class SystemContext {
     }
 
     /**
-     * ★ 根据模式初始化房间
+     * 根据模式初始化房间
      */
     private void initializeRoomsForMode(ACMode mode) {
         double defaultTargetTemp = (mode == ACMode.HEATING) ? 23.0 : 25.0; // ★ 制热23度，制冷25度

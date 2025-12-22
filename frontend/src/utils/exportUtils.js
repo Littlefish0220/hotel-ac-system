@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx'
 import jsPDF from 'jspdf'
 import 'jspdf-autotable'
-import html2canvas from 'html2canvas'  // ★ 新增导入
+import html2canvas from 'html2canvas'  // 新增导入
 
 /**
  * 导出TXT格式账单（保持不变）

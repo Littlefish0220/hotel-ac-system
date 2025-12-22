@@ -23,4 +23,9 @@ public class InMemoryAccommodationOrderRepository implements AccommodationOrderR
     public Optional<AccommodationOrder> findByRoomId(String roomId) {
         return Optional.ofNullable(data.get(roomId));
     }
+
+    @Override
+    public void deleteByRoomId(String roomId) {
+        data.remove(roomId);
+    }
 }

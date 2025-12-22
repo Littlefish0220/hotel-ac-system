@@ -92,6 +92,17 @@
               </span>
               <span class="value fee-value">¥{{ (room.fee || 0).toFixed(2) }}</span>
             </div>
+
+            <div class="info-row">
+              <span class="label">
+                <el-icon><Wallet /></el-icon>
+                押金
+              </span>
+              <span class="value">
+                ¥{{ BillingStore.getDeposit(room.roomNo) || 0 }}
+              </span>
+            </div>
+
           </div>
 
           <div class="card-actions">
@@ -172,6 +183,15 @@
               </template>
             </el-input>
           </el-form-item>
+          <el-form-item label="押金金额 / Deposit">
+            <el-input-number
+              v-model="checkInForm.deposit"
+              :min="0"
+              :step="50"
+              controls-position="right"
+              style="width: 100%"
+            />
+          </el-form-item>
           <div class="price-notice">
             <div class="notice-label">当前房价</div>
             <div class="notice-value">¥{{ currentRoomRate }} <small>/天</small></div>
@@ -242,9 +262,17 @@
                 <div class="cost-label">住宿费用</div>
                 <div class="cost-value">¥{{ currentBill.roomFee.toFixed(2) }}</div>
               </div>
+              <div class="cost-item">
+                <div class="cost-label">押金</div>
+                <div class="cost-value">¥{{ currentBill.deposit.toFixed(2) }}</div>
+              </div>
               <div class="cost-item total">
-                <div class="cost-label">总计</div>
-                <div class="cost-value">¥{{ currentBill.total.toFixed(2) }}</div>
+                <div class="cost-label">
+                  {{ currentBill.refund >= 0 ? '应退金额' : '需补金额' }}
+                </div>
+                <div class="cost-value">
+                  ¥{{ Math.abs(currentBill.refund).toFixed(2) }}
+                </div>
               </div>
             </div>
           </div>
@@ -447,7 +475,8 @@ const checkInVisible = ref(false)
 const checkOutVisible = ref(false)
 const selectedRoom = ref(null)
 
-const checkInForm = reactive({ roomNo: '', name: '' })
+//const checkInForm = reactive({ roomNo: '', name: '' })
+const checkInForm = reactive({ roomNo: '', name: '', deposit: 300})
 
 const currentBill = reactive({ 
   roomNo: '', 
@@ -456,7 +485,9 @@ const currentBill = reactive({
   roomFee: 0,
   total: 0,
   checkInDays: 0,
-  detailLogs: []
+  detailLogs: [],
+  deposit: 0,
+  refund: 0 
 })
 
 const detailViewVisible = ref(false)
@@ -508,9 +539,14 @@ const submitCheckIn = async () => {
     return
   }
   try {
-    await api.checkIn(selectedRoom.value.roomNo, checkInForm.name)
+    await api.checkIn(selectedRoom.value.roomNo, checkInForm.name, checkInForm.deposit)
+    // 登记押金
+    BillingStore.setDeposit(
+      selectedRoom.value.roomNo,
+      checkInForm.deposit
+    )
     checkInVisible.value = false
-    ElMessage.success(`房间 ${selectedRoom.value.roomNo} 入住成功`)
+    ElMessage.success(`房间 ${selectedRoom.value.roomNo} 入住成功，已收押金 ¥${checkInForm.deposit}`)
     fetchRooms()
   } catch (e) { 
     console.error('[入住] 失败:', e)
@@ -565,8 +601,7 @@ const openCheckOut = async (room) => {
   selectedRoom.value = room
   try {
     const response = await api.getBillPreview(room.roomNo)
-    const res = response.data || response 
-    
+    const res = response.data || response
     if (res.code === 200 && res.data) {
       const bill = res.data
       Object.assign(currentBill, {
@@ -575,6 +610,8 @@ const openCheckOut = async (room) => {
         acFee: parseFloat(bill.acFee) || 0,
         roomFee: parseFloat(bill.roomFee) || 0,
         total: parseFloat(bill.total) || 0,
+        deposit: parseFloat(bill.deposit),
+        refund: parseFloat(bill.refund),
         checkInDays: bill.days || bill.checkInDays || 0,
         detailLogs: bill.detailLogs || []
       })
@@ -682,7 +719,7 @@ const submitCheckOut = async () => {
   try {
     await api.checkOut(selectedRoom.value.roomNo)
     BillingStore.clearRoom(selectedRoom.value.roomNo)
-
+    BillingStore.clearDeposit(selectedRoom.value.roomNo)
     checkOutVisible.value = false
     ElMessage.success('退房成功，房间已重置')
     
@@ -691,6 +728,8 @@ const submitCheckOut = async () => {
     currentBill.acFee = 0
     currentBill.roomFee = 0
     currentBill.total = 0
+    currentBill.deposit = 0
+    currentBill.refund = 0
     currentBill.checkInDays = 0
     currentBill.detailLogs = []
     

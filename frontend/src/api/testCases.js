@@ -11,7 +11,7 @@ export const ROOM_INIT_CONFIG = [
 
 // 2. 验收测试脚本
 export const TEST_SCENARIO = [
-  // ★ t=0: 所有测试房间办理入住
+  // t=0: 所有测试房间办理入住
   { timeOffset: 0, roomNo: '101', action: 'checkIn', customerName: '张三' },
   { timeOffset: 0, roomNo: '102', action: 'checkIn', customerName: '李四' },
   { timeOffset: 0, roomNo: '103', action: 'checkIn', customerName: '王五' },

@@ -84,7 +84,9 @@ public class CustomerServiceImpl implements CustomerService {
 
                 long now = Instant.now().toEpochMilli();
                 order.setCheckOutTime(now);
+                // 保存退房时间后从仓储中移除订单（释放房间关联），前端状态将不再显示顾客信息
                 orderRepository.save(order);
+                orderRepository.deleteByRoomId(roomId);
 
                 // 更新房间状态为空闲待清理（这里用 IDLE 简化）
                 room.setCurrentCustomerId(null);
