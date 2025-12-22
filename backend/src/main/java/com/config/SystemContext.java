@@ -104,7 +104,7 @@ public class SystemContext {
     }
 
     /**
-     * ★ 新增：根据模式初始化房间
+     * ★ 根据模式初始化房间
      */
     private void initializeRoomsForMode(ACMode mode) {
         double defaultTargetTemp = (mode == ACMode.HEATING) ? 23.0 : 25.0; // ★ 制热23度，制冷25度
@@ -115,28 +115,38 @@ public class SystemContext {
             room101.setCheckInDays(0);
             room101.setTargetTemp(defaultTargetTemp); // ★ 设置默认目标温度
             roomRepository.save(room101);
+            System.out.println("[SystemContext] 房间101 制热模式初始化: 当前温度=" + room101.getCurrentTemperature() + "°C, 目标温度="
+                    + room101.getTargetTemperature() + "°C");
 
             Room room102 = new Room("102", 15.0, 125.0);
             room102.setCheckInDays(0);
             room102.setTargetTemp(defaultTargetTemp);
             roomRepository.save(room102);
+            System.out.println("[SystemContext] 房间102 制热模式初始化: 当前温度=" + room102.getCurrentTemperature() + "°C, 目标温度="
+                    + room102.getTargetTemperature() + "°C");
 
             Room room103 = new Room("103", 18.0, 150.0);
             room103.setCheckInDays(0);
             room103.setTargetTemp(defaultTargetTemp);
             roomRepository.save(room103);
+            System.out.println("[SystemContext] 房间103 制热模式初始化: 当前温度=" + room103.getCurrentTemperature() + "°C, 目标温度="
+                    + room103.getTargetTemperature() + "°C");
 
             Room room104 = new Room("104", 12.0, 200.0);
             room104.setCheckInDays(0);
             room104.setTargetTemp(defaultTargetTemp);
             roomRepository.save(room104);
+            System.out.println("[SystemContext] 房间104 制热模式初始化: 当前温度=" + room104.getCurrentTemperature() + "°C, 目标温度="
+                    + room104.getTargetTemperature() + "°C");
 
             Room room105 = new Room("105", 14.0, 100.0);
             room105.setCheckInDays(0);
             room105.setTargetTemp(defaultTargetTemp);
             roomRepository.save(room105);
+            System.out.println("[SystemContext] 房间105 制热模式初始化: 当前温度=" + room105.getCurrentTemperature() + "°C, 目标温度="
+                    + room105.getTargetTemperature() + "°C");
 
-            System.out.println("制热模式：房间初始温度设置为低温（10-18℃）");
+            System.out.println("制热模式：房间初始温度设置为低温（10-18℃），目标温度统一设为 " + defaultTargetTemp + "°C");
         } else {
             // 制冷模式：高温初始化
             Room room101 = new Room("101", 32.0, 100.0);
@@ -164,7 +174,7 @@ public class SystemContext {
             room105.setTargetTemp(defaultTargetTemp);
             roomRepository.save(room105);
 
-            System.out.println("制冷模式：房间初始温度设置为高温（28-35℃）");
+            System.out.println("制冷模式：房间初始温度设置为高温（28-35℃），目标温度统一设为 " + defaultTargetTemp + "°C");
         }
     }
 
