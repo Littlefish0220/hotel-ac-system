@@ -135,7 +135,7 @@
       </div>
     </el-card>
 
-    <!-- 监控内容区 -->
+    <!-- 监控内容区 (支持滚动) -->
     <div class="monitor-content" :class="{ 'offline-mode': !isSystemOn }">
       <div class="dashboard-side">
         <div class="dash-card glass-panel">
@@ -171,99 +171,126 @@
         </div>
       </div>
 
-      <div class="table-container glass-panel">
-        <div class="table-header-row">
-          <span class="table-title">实时终端状态监控</span>
-          <el-button size="small" type="primary" link :icon="Refresh" @click="fetchData">刷新</el-button>
+      <div class="right-content-area">
+        <!-- 表格部分 -->
+        <div class="table-container glass-panel">
+          <div class="table-header-row">
+            <span class="table-title">实时终端状态监控</span>
+            <el-button size="small" type="primary" link :icon="Refresh" @click="fetchData">刷新</el-button>
+          </div>
+
+          <el-table 
+            :data="rooms" 
+            style="width: 100%;"
+            height="350"
+            :header-cell-style="headerCellStyle"
+            :cell-style="cellStyle"
+            :row-style="rowStyle"
+          >
+             <el-table-column prop="roomNo" label="房间" width="90" fixed>
+              <template #default="scope">
+                <span class="room-no">{{ scope.row.roomNo }}</span>
+              </template>
+            </el-table-column>
+            
+            <el-table-column label="状态" width="100">
+              <template #default="scope">
+                <div class="status-tag" :class="scope.row.state">
+                  <span class="dot"></span>
+                  <span>{{ getStatusText(scope.row.state) }}</span>
+                </div>
+              </template>
+            </el-table-column>
+
+            <el-table-column label="风速" width="100">
+              <template #default="scope">
+                <el-tag v-if="scope.row.fanSpeed === 'HIGH'" type="danger" effect="dark" size="small">高速</el-tag>
+                <el-tag v-else-if="scope.row.fanSpeed === 'MEDIUM'" type="warning" effect="dark" size="small">中速</el-tag>
+                <el-tag v-else-if="scope.row.fanSpeed === 'LOW'" type="success" effect="dark" size="small">低速</el-tag>
+                <span v-else class="no-data">-</span>
+              </template>
+            </el-table-column>
+            
+            <el-table-column label="初始温度" width="100">
+              <template #default="scope">
+                <span class="temp-value initial">{{ scope.row.initialTemp }}°</span>
+              </template>
+            </el-table-column>
+            
+            <el-table-column prop="currentTemp" label="当前温度" width="100">
+              <template #default="scope">
+                <span class="temp-value current">{{ scope.row.currentTemp }}°</span>
+              </template>
+            </el-table-column>
+            
+            <el-table-column prop="targetTemp" label="目标温度" width="100">
+               <template #default="scope">
+                 <span class="temp-value target">{{ scope.row.targetTemp }}°</span>
+               </template>
+            </el-table-column>
+
+            <el-table-column label="入住天数" width="100">
+              <template #default="scope">
+                <span class="days-value">{{ scope.row.checkInDays || 0 }} 天</span>
+              </template>
+            </el-table-column>
+
+            <el-table-column label="本次消费" width="110">
+              <template #default="scope">
+                <span class="fee-value session">¥ {{ (scope.row.sessionFee || 0).toFixed(2) }}</span>
+              </template>
+            </el-table-column>
+
+            <el-table-column label="累计总费" sortable min-width="110">
+              <template #default="scope">
+                <span class="fee-value total">¥ {{ (scope.row.fee || 0).toFixed(2) }}</span>
+              </template>
+            </el-table-column>
+
+            <el-table-column label="服务时长" width="100">
+              <template #default="scope">
+                <span class="duration-value">{{ formatDuration(scope.row.serviceDuration) }}</span>
+              </template>
+            </el-table-column>
+          </el-table>
         </div>
 
-        <el-table 
-          :data="rooms" 
-          style="width: 100%;"
-          height="480"
-          :header-cell-style="headerCellStyle"
-          :cell-style="cellStyle"
-          :row-style="rowStyle"
-        >
-           <el-table-column prop="roomNo" label="房间" width="90" fixed>
-            <template #default="scope">
-              <span class="room-no">{{ scope.row.roomNo }}</span>
-            </template>
-          </el-table-column>
-          
-          <el-table-column label="状态" width="100">
-            <template #default="scope">
-              <div class="status-tag" :class="scope.row.state">
-                <span class="dot"></span>
-                <span>{{ getStatusText(scope.row.state) }}</span>
-              </div>
-            </template>
-          </el-table-column>
-
-          <el-table-column label="风速" width="100">
-            <template #default="scope">
-              <el-tag v-if="scope.row.fanSpeed === 'HIGH'" type="danger" effect="dark" size="small">高速</el-tag>
-              <el-tag v-else-if="scope.row.fanSpeed === 'MEDIUM'" type="warning" effect="dark" size="small">中速</el-tag>
-              <el-tag v-else-if="scope.row.fanSpeed === 'LOW'" type="success" effect="dark" size="small">低速</el-tag>
-              <span v-else class="no-data">-</span>
-            </template>
-          </el-table-column>
-          
-          <el-table-column label="初始温度" width="100">
-            <template #default="scope">
-              <span class="temp-value initial">{{ scope.row.initialTemp }}°</span>
-            </template>
-          </el-table-column>
-          
-          <el-table-column prop="currentTemp" label="当前温度" width="100">
-            <template #default="scope">
-              <span class="temp-value current">{{ scope.row.currentTemp }}°</span>
-            </template>
-          </el-table-column>
-          
-          <el-table-column prop="targetTemp" label="目标温度" width="100">
-             <template #default="scope">
-               <span class="temp-value target">{{ scope.row.targetTemp }}°</span>
-             </template>
-          </el-table-column>
-
-          <el-table-column label="入住天数" width="100">
-            <template #default="scope">
-              <span class="days-value">{{ scope.row.checkInDays || 0 }} 天</span>
-            </template>
-          </el-table-column>
-
-          <el-table-column label="本次消费" width="110">
-            <template #default="scope">
-              <span class="fee-value session">¥ {{ (scope.row.sessionFee || 0).toFixed(2) }}</span>
-            </template>
-          </el-table-column>
-
-          <el-table-column label="累计总费" sortable min-width="110">
-            <template #default="scope">
-              <span class="fee-value total">¥ {{ (scope.row.fee || 0).toFixed(2) }}</span>
-            </template>
-          </el-table-column>
-
-          <el-table-column label="服务时长" width="100">
-            <template #default="scope">
-              <span class="duration-value">{{ formatDuration(scope.row.serviceDuration) }}</span>
-            </template>
-          </el-table-column>
-        </el-table>
+        <!-- 温度变化折线图 -->
+        <div class="chart-container glass-panel">
+          <div class="chart-header">
+            <span class="chart-title">温度变化趋势 (基于Sim Time)</span>
+            <el-select 
+              v-model="selectedRoomForChart" 
+              placeholder="选择房间" 
+              size="small"
+              class="chart-room-select"
+              popper-class="glass-select-dropdown"
+              @change="updateChart"
+            >
+              <el-option 
+                v-for="room in rooms" 
+                :key="room.roomNo" 
+                :label="room.roomNo + ' 房间'" 
+                :value="room.roomNo" 
+              />
+            </el-select>
+          </div>
+          <div id="tempChart" style="width: 100%; height: 300px;"></div>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { reactive, computed, ref, onMounted, onUnmounted, watch } from 'vue'
+import { reactive, computed, ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { SwitchButton, Refresh, Monitor, WindPower, Timer } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '../../api/index.js' 
 import { TEST_SCENARIO } from '../../api/testCases.js'
 import { TEST_SCENARIO_HEAT } from '../../api/testCasesHeat.js'
 import { BillingStore } from '../../utils/billingStore.js'
+import * as echarts from 'echarts'
 
 const rooms = ref([])
 const isSystemOn = ref(true)
@@ -273,6 +300,12 @@ const timeMinute = ref(0)
 const isTestRunning = ref(false)
 const progressValue = ref(0)
 const selectedScenario = ref('cool')
+
+// 图表相关
+const selectedRoomForChart = ref('101') 
+let chartInstance = null
+const roomHistoryData = reactive({}) 
+let simulationTimer = null // 前端平滑动画定时器
 
 const runningCount = computed(() => rooms.value.filter(r => r.state === 'running').length)
 const waitingCount = computed(() => rooms.value.filter(r => r.state === 'waiting').length)
@@ -311,6 +344,7 @@ const formatDuration = (seconds) => {
   return `${mins}分钟` 
 }
 
+// 获取数据（只更新表格，不直接推入图表数据点）
 const fetchData = async () => {
   if (!isSystemOn.value) return 
   try {
@@ -320,10 +354,153 @@ const fetchData = async () => {
       isSystemOn.value = res.data.system.isSystemOn
       currentMode.value = res.data.system.mode
       timeMinute.value = res.data.system.timeCounter
+      
+      // 初始化数据结构（如果不存在）
+      rooms.value.forEach(room => {
+        if (!roomHistoryData[room.roomNo]) {
+          roomHistoryData[room.roomNo] = { 
+            times: [], 
+            currentTemps: [], 
+            targetTemps: [],
+            simulatedTemp: room.currentTemp 
+          }
+        }
+      })
     }
   } catch (e) { 
     console.error(e) 
   }
+}
+
+// ★ 核心图表逻辑：在每个 Sim Time 步进时调用
+// 参数 currentTime 是当前的仿真时间 (分钟)
+const updateChartDataAtTimeStep = (currentTime) => {
+  if (!rooms.value || rooms.value.length === 0) return
+
+  rooms.value.forEach(room => {
+    if (!roomHistoryData[room.roomNo]) {
+      roomHistoryData[room.roomNo] = { times: [], currentTemps: [], targetTemps: [] }
+    }
+    
+    const history = roomHistoryData[room.roomNo]
+    // 横轴标签：T=1, T=2...
+    const timeLabel = `T=${currentTime}` 
+    
+    // ★ 关键修改：移除历史数据长度限制，保留所有点
+    // if (history.times.length > 20) { 
+    //   history.times.shift()
+    //   history.currentTemps.shift()
+    //   history.targetTemps.shift()
+    // }
+    
+    // 记录数据点
+    history.times.push(timeLabel)
+    history.currentTemps.push(room.currentTemp)
+    history.targetTemps.push(room.targetTemp || null)
+  })
+
+  // 立即刷新图表
+  if (chartInstance && selectedRoomForChart.value) {
+    updateChart()
+  }
+}
+
+const initChart = () => {
+  const chartDom = document.getElementById('tempChart')
+  if (!chartDom) return
+  
+  chartInstance = echarts.init(chartDom)
+  
+  const option = {
+    backgroundColor: 'transparent',
+    // ★ 关键修改：开启 ECharts 自带动画，时长 1000ms（与步进时间一致），线性 easing
+    animation: true,
+    animationDuration: 1000, 
+    animationEasing: 'linear',
+    
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: 'rgba(0,0,0,0.8)',
+      borderColor: '#11998e',
+      textStyle: { color: '#fff' }
+    },
+    legend: {
+      data: ['当前温度', '目标温度'],
+      textStyle: { color: '#ccc' },
+      top: 0
+    },
+    grid: {
+      top: '30px', left: '3%', right: '4%', bottom: '3%', containLabel: true
+    },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: [],
+      axisLine: { lineStyle: { color: '#555' } },
+      axisLabel: { 
+        color: '#999',
+        interval: 'auto', // 自动决定显示间隔，防止所有点都挤在一起
+      }
+    },
+    yAxis: {
+      type: 'value',
+      scale: true, // 自动缩放
+      min: (value) => Math.floor(value.min), 
+      max: (value) => Math.ceil(value.max),
+      axisLine: { show: false },
+      axisLabel: { color: '#999', formatter: '{value} °C' },
+      splitLine: { lineStyle: { color: '#333' } }
+    },
+    series: [
+      {
+        name: '当前温度',
+        type: 'line',
+        showSymbol: true, 
+        symbolSize: 6,
+        data: [],
+        itemStyle: { color: '#38ef7d' },
+        lineStyle: { width: 2 },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(56, 239, 125, 0.3)' },
+            { offset: 1, color: 'rgba(56, 239, 125, 0)' }
+          ])
+        }
+      },
+      {
+        name: '目标温度',
+        type: 'line',
+        step: 'start', 
+        showSymbol: false,
+        data: [],
+        itemStyle: { color: '#e6a23c' },
+        lineStyle: { type: 'dashed', width: 2 }
+      }
+    ]
+  }
+  chartInstance.setOption(option)
+  window.addEventListener('resize', () => chartInstance.resize())
+}
+
+const updateChart = () => {
+  if (!chartInstance || !selectedRoomForChart.value) return
+  
+  const data = roomHistoryData[selectedRoomForChart.value]
+  if (!data || data.currentTemps.length === 0) {
+    chartInstance.setOption({
+      xAxis: { data: [] },
+      series: [{ data: [] }, { data: [] }]
+    })
+    return 
+  }
+  
+  chartInstance.setOption({
+    xAxis: { data: data.times },
+    series: [
+      { data: data.currentTemps },
+      { data: data.targetTemps }
+    ]
+  })
 }
 
 const toggleSystem = () => {
@@ -364,6 +541,9 @@ const toggleMode = async () => {
     
     await api.changeSystemMode(newMode)
     currentMode.value = newMode
+    // 清空历史数据
+    for (const key in roomHistoryData) delete roomHistoryData[key]
+    
     await fetchData()
     ElMessage.success(`已切换为${newMode === 'cool' ? '制冷' : '制热'}模式，房间温度已重新初始化`)
   } catch (e) {
@@ -379,13 +559,11 @@ let progressTimer = null
 const processStepsForTime = async (targetTime) => {
   console.log(`>>> Executing Actions for SimTime: ${targetTime} min`)
   
-  // ★ 更新模拟时间
   BillingStore.setSimTime(targetTime)
   const actions = currentTestScenario.value.filter(item => item.timeOffset === targetTime)
   
   for (const act of actions) {
     if (act.action === 'checkIn') {
-      console.log(`[入住] 房间 ${act.roomNo}，顾客：${act.customerName}`)
       await api.checkIn(act.roomNo, act.customerName)
       BillingStore.initRoom(act.roomNo, act.customerName)
     } else if (act.action === 'powerOn') {
@@ -399,23 +577,17 @@ const processStepsForTime = async (targetTime) => {
       BillingStore.recordEvent(act.roomNo, 'powerOff', {}, targetTime)
       await api.controlRoom(act.roomNo, { action: 'powerOff' })
     } else if (act.fanSpeed && !act.targetTemp) {
-      // ★ 只调速
       BillingStore.recordEvent(act.roomNo, 'fanSpeedChange', { fanSpeed: act.fanSpeed }, targetTime)
       await api.controlRoom(act.roomNo, { fanSpeed: act.fanSpeed })
     } else if (act.targetTemp && !act.fanSpeed) {
-      // ★ 只调温（新增分支）
-      console.log(`[调温] 房间 ${act.roomNo} -> ${act.targetTemp}℃`)
       await api.controlRoom(act.roomNo, { targetTemp: act.targetTemp })
     } else if (act.targetTemp && act.fanSpeed) {
-      // ★ 同时调温调速
-      console.log(`[调整] 房间 ${act.roomNo} -> ${act.targetTemp}℃, ${act.fanSpeed}`)
       await api.controlRoom(act.roomNo, { 
         targetTemp: act.targetTemp, 
         fanSpeed: act.fanSpeed 
       })
     }
   }
-
 }
 
 const maxScenarioTime = computed(() => {
@@ -436,7 +608,6 @@ const startTest = async () => {
   isTestRunning.value = true
   progressValue.value = 0
 
-  // ★ 重置计费系统
   BillingStore.clearAll()
   BillingStore.resetTime()
   
@@ -444,7 +615,13 @@ const startTest = async () => {
   await api.changeSystemMode(testMode)
   currentMode.value = testMode
   
+  // 清空图表数据
+  for (const key in roomHistoryData) delete roomHistoryData[key]
+  
   await fetchData()
+  // ★ 初始状态记录 T=0
+  updateChartDataAtTimeStep(0)
+  
   let localNextTime = 0 
 
   ElMessage.success(`验收测试开始（${selectedScenario.value === 'heat' ? '制热模式' : '制冷模式'}），共 ${maxScenarioTime.value + 1} 分钟用例`)
@@ -469,10 +646,15 @@ const startTest = async () => {
     console.log(`\n========== 时间推进到 t=${localNextTime} ==========`)
     await api.sendTimeTick()
     await processStepsForTime(localNextTime)
+    
+    // ★ 关键修改：在每个 Sim Time 步进结束时，获取最新状态并更新图表
     await fetchData()
+    updateChartDataAtTimeStep(localNextTime)
+    
     progressValue.value = 0
   }
 
+  // 10秒一个循环，代表1分钟
   testTimer = setInterval(loop, 10000)
   progressTimer = setInterval(() => {
     if (progressValue.value < 100) {
@@ -484,26 +666,36 @@ const startTest = async () => {
 let autoRefreshTimer = null
 onMounted(() => {
   fetchData()
-  autoRefreshTimer = setInterval(fetchData, 1000)
+  autoRefreshTimer = setInterval(fetchData, 10000) // 后台同步：10s一次
+  nextTick(() => {
+    initChart()
+  })
 })
 
 onUnmounted(() => {
   if (testTimer) clearInterval(testTimer)
   if (progressTimer) clearInterval(progressTimer)
   if (autoRefreshTimer) clearInterval(autoRefreshTimer)
+  if (simulationTimer) clearInterval(simulationTimer)
+  if (chartInstance) {
+    window.removeEventListener('resize', () => chartInstance.resize())
+    chartInstance.dispose()
+  }
 })
 </script>
 
 <style scoped>
-/* 基础容器 */
+/* 基础容器：支持纵向滚动 */
 .monitor-container {
   padding: 24px 32px;
-  min-height: 100vh;
+  height: 100vh; /* 固定高度 */
   background: linear-gradient(135deg, #0a1f1a 0%, #061e18 100%);
   position: relative;
-  overflow: hidden;
+  overflow: hidden; /* 隐藏最外层滚动条，使用内部滚动 */
   color: #fff;
   font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  display: flex;
+  flex-direction: column;
 }
 
 /* 背景动画层 */
@@ -573,8 +765,9 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
   padding: 0 4px;
+  flex-shrink: 0;
 }
 
 .title-box h2 {
@@ -675,7 +868,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: rgba(0, 0, 0, 0.2) !important;  /* ★ 降低背景深度 */
+  background: rgba(0, 0, 0, 0.2) !important;
   padding: 8px 12px;
   border-radius: 28px;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -704,12 +897,11 @@ onUnmounted(() => {
   background: transparent !important;
 }
 :deep(.scenario-selector .el-input__prefix) {
-  display: none;  /* 隐藏前缀图标，避免影响居中 */
+  display: none;
 }
 :deep(.scenario-selector .el-input__wrapper) {
   background-color: rgba(0, 0, 0, 0.25) !important;
 }
-/* ★ 强制覆盖选择器内所有元素 */
 :deep(.scenario-selector *) {
   background-color: transparent !important;
 }
@@ -739,6 +931,7 @@ onUnmounted(() => {
   animation: fadeIn 0.5s ease-out;
   position: relative;
   z-index: 10;
+  flex-shrink: 0;
 }
 .progress-info {
   display: flex;
@@ -762,6 +955,7 @@ onUnmounted(() => {
 .control-panel {
   position: relative;
   z-index: 10;
+  flex-shrink: 0;
 }
 .panel-header {
   display: flex;
@@ -915,8 +1109,8 @@ onUnmounted(() => {
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 0;
   background: transparent !important;
-  border: none !important;  /* ★ 添加 */
-  outline: none !important;  /* ★ 添加 */
+  border: none !important;  
+  outline: none !important;  
 }
 .mode-slider.cool {
   background: linear-gradient(135deg, #409EFF 0%, #67C23A 100%) !important;
@@ -962,13 +1156,35 @@ onUnmounted(() => {
   background-color: rgba(255,255,255,0.2) !important;
   color: #fff !important;
 }
+
+/* ★ 修改：监控内容区域，支持滚动 */
 .monitor-content {
   display: flex;
   gap: 24px;
   position: relative;
   z-index: 10;
   transition: all 0.5s ease;
+  overflow-y: auto; /* 核心修改：允许垂直滚动 */
+  flex: 1; /* 占满剩余高度 */
+  padding-bottom: 20px;
 }
+
+/* 隐藏滚动条但保留功能 */
+.monitor-content::-webkit-scrollbar {
+  width: 8px;
+}
+.monitor-content::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+.monitor-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+.monitor-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
 .offline-mode {
   filter: grayscale(100%);
   opacity: 0.5;
@@ -980,6 +1196,9 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  position: sticky; /* 侧边栏吸顶 */
+  top: 0;
+  height: fit-content;
 }
 .dash-card {
   display: flex;
@@ -1050,11 +1269,23 @@ onUnmounted(() => {
 .mode-status-card {
   transition: all 0.3s ease;
 }
-.table-container {
+
+/* 右侧内容区域 */
+.right-content-area {
   flex: 1;
-  padding: 24px;
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow: visible; /* 允许内部元素撑开，由外部 monitor-content 滚动 */
 }
+
+/* 表格容器 */
+.table-container {
+  flex: none; 
+  height: auto;
+  padding: 24px;
+}
+
 .table-header-row {
   display: flex;
   justify-content: space-between;
@@ -1141,6 +1372,7 @@ onUnmounted(() => {
   color: #67C23A;
   font-weight: 600;
   font-size: 13px;
+  letter-spacing: 0.3px;
 }
 .fee-value {
   font-family: 'Courier New', monospace;
@@ -1177,10 +1409,56 @@ onUnmounted(() => {
   background: rgba(103, 194, 58, 0.2);
   color: #67C23A;
 }
+
+/* 图表容器样式 */
+.chart-container {
+  flex: none; 
+  height: 350px;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.chart-title {
+  font-size: 16px;
+  font-weight: 600;
+  border-left: 4px solid #e6a23c;
+  padding-left: 12px;
+  letter-spacing: 0.5px;
+  color: #e5eaf3;
+}
+
+.chart-room-select {
+  width: 120px;
+}
+
+:deep(.chart-room-select .el-input__wrapper) {
+  background-color: rgba(0, 0, 0, 0.25) !important;
+  box-shadow: none !important;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+}
+
+:deep(.chart-room-select .el-input__inner) {
+  color: #fff;
+}
+
 @media (max-width: 1400px) {
   .monitor-content { flex-direction: column; }
-  .dashboard-side { flex-direction: row; flex: none; }
+  .dashboard-side { 
+    flex-direction: row; 
+    flex: none; 
+    position: static; /* 小屏取消吸顶 */
+  }
   .dash-card { flex: 1; }
+  .right-content-area { height: auto; }
 }
 @media (max-width: 768px) {
   .monitor-container { padding: 16px; }
@@ -1196,7 +1474,7 @@ onUnmounted(() => {
 :deep(.el-table__body-wrapper)::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.3); }
 </style>
 <style>
-/* ★ 全局样式：下拉框 - 完全参考登录界面 */
+/* ★ 全局样式：下拉框 */
 .glass-select-dropdown.el-popper {
   background: rgba(16, 36, 30, 0.95) !important;
   backdrop-filter: blur(10px) !important;
@@ -1208,7 +1486,6 @@ onUnmounted(() => {
   background: rgba(16, 36, 30, 0.95) !important;
   border: 1px solid rgba(255, 255, 255, 0.1) !important;
 }
-/* ★ 强制覆盖下拉框内所有元素 */
 .glass-select-dropdown * {
   background: transparent !important;
 }
